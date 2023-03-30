@@ -1,0 +1,3 @@
+[submodule "stylegan-xl"]
+	path = stylegan-xl
+	url = https://github.com/autonomousvision/stylegan-xl
