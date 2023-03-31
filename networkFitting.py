@@ -1,9 +1,10 @@
 import click, torch, sys, cv2, PIL, numpy as np, os
 from time import perf_counter
 from tqdm import trange
-sys.path.insert(1, './stylegan-xl')
+sys.path.insert(1, 'stylegan-xl')
 import dnnlib, legacy
 from torch_utils.ops import filtered_lrelu, bias_act
+from run_inversion import project
 
 def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
     if verbose: print('Loading networks from "%s"...' % network_pkl)
@@ -47,6 +48,53 @@ def initPlugins(verbose:bool=True):
     bias_act._init(verbosity)
     filtered_lrelu._init(verbosity)
 
+def calculLatents(
+    G,
+    images,
+    device:torch.device,
+    first_inv_steps:int=1000,
+    inv_steps:int=100,
+    w_init_path:str=None,
+    save_latent:bool=False,
+    save_video_latent:bool=False,
+    outdir:str='out'
+):
+    w_pivots = []
+    if w_init_path:
+        w_pivots.append(torch.from_numpy(np.load(w_init_path)['w'])[0].to(device))
+    w_imgs = []
+    wrimgs = []
+    for i in trange(len(images), desc='Calcul latents', unit='image'):
+        imgs, w_pivot = project(
+            G,
+            target=images[i], # pylint: disable=not-callable
+            num_steps=(inv_steps if len(w_pivots)>0 else first_inv_steps),
+            device=device,
+            verbose=True,
+            noise_mode='const',
+            w_start_pivot=(w_pivots[-1] if len(w_pivots)>0 else None)
+        )
+        w_pivots.append(w_pivot)
+        if save_latent:
+            np.savez(f'{opts.outdir}/latent{i}.npz', w=w_pivot.unsqueeze(0).cpu().detach().numpy())
+        if save_video_latent:
+            w_imgs += imgs
+            synth_image = G.synthesis(w_pivot.repeat(1, G.num_ws, 1))
+            synth_image = (synth_image + 1) * (255/2)
+            synth_image = synth_image.permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+            wrimgs.append(synth_image)
+    
+    if save_video_latent:
+        video = imageio.get_writer(f'{opts.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+        for synth_image in w_imgs:
+            video.append_data(np.array(synth_image))
+        video.close()
+        video = imageio.get_writer(f'{opts.outdir}/resultLatent.mp4', mode='I', fps=opts.v_fps, codec='libx264', bitrate='16M')
+        for synth_image in wrimgs:
+            video.append_data(np.array(synth_image))
+        video.close()
+    return w_pivots
+
 def fitting(**kwargs):
     start_time = perf_counter()
     opts = dnnlib.EasyDict(kwargs)
@@ -54,6 +102,8 @@ def fitting(**kwargs):
     G = loadNetwork(opts.network_pkl, device, opts.verbose)
     images = getImagesFromVideo(opts.target_fname, opts.ips, device, opts.verbose, G.img_resolution)
     initPlugins(opts.verbose)
+    os.makedirs(opts.outdir, exist_ok=True)
+    w_pivots = calculLatents(G,images,device,opts.first_inv_steps,opts.inv_steps,opts.w_init,opts.save_latent,opts.save_video_latent,opts.outdir)
     
 
 @click.command()

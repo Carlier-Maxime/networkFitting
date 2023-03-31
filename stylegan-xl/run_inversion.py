@@ -151,34 +151,35 @@ def project(
     verbose = False,
     device: torch.device,
     noise_mode="const",
+    w_start_pivot=None
 ):
     assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
 
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device) # type: ignore
 
-    # Compute w stats.
-    print(f'Computing W midpoint and stddev using {w_avg_samples} samples...')
-    z_samples = torch.from_numpy(np.random.RandomState(123).randn(w_avg_samples, G.z_dim)).to(device)
+    if w_start_pivot==None:
+        z_samples = torch.from_numpy(np.random.RandomState(123).randn(w_avg_samples, G.z_dim)).to(device)
+        if not G.c_dim:
+            c_samples = None
+        else:
+            classifier = timm.create_model('deit_base_distilled_patch16_224', pretrained=True).eval().to(device)
+            cls_target = F.interpolate((target.to(device).to(torch.float32) / 127.5 - 1)[None], 224)
+            logits = classifier(cls_target).softmax(1)
+            classes = torch.multinomial(logits, w_avg_samples, replacement=True).squeeze()
+            print(f'Main class: {logits.argmax(1).item()}, confidence: {logits.max().item():.4f}')
+            c_samples = np.zeros([w_avg_samples, G.c_dim], dtype=np.float32)
+            for i, c in enumerate(classes):
+                c_samples[i, c] = 1
+            c_samples = torch.from_numpy(c_samples).to(device)
 
-    # get class probas by classifier
-    if not G.c_dim:
-        c_samples = None
+        w_samples = G.mapping(z_samples, c_samples)  # [N, L, C]
+
+        w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)       # [N, 1, C]
+        w_avg = np.mean(w_samples, axis=0, keepdims=True)      # [1, 1, C]
+        w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device, requires_grad=True) # pylint: disable=not-callable
     else:
-        classifier = timm.create_model('deit_base_distilled_patch16_224', pretrained=True).eval().to(device)
-        cls_target = F.interpolate((target.to(device).to(torch.float32) / 127.5 - 1)[None], 224)
-        logits = classifier(cls_target).softmax(1)
-        classes = torch.multinomial(logits, w_avg_samples, replacement=True).squeeze()
-        print(f'Main class: {logits.argmax(1).item()}, confidence: {logits.max().item():.4f}')
-        c_samples = np.zeros([w_avg_samples, G.c_dim], dtype=np.float32)
-        for i, c in enumerate(classes):
-            c_samples[i, c] = 1
-        c_samples = torch.from_numpy(c_samples).to(device)
-
-    w_samples = G.mapping(z_samples, c_samples)  # [N, L, C]
-
-    # get empirical w_avg
-    w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)       # [N, 1, C]
-    w_avg = np.mean(w_samples, axis=0, keepdims=True)      # [1, 1, C]
+        w_opt = w_start_pivot
+        w_opt.requires_grad_(True)
 
     # Load VGG16 feature detector.
     vgg16_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/vgg16.pkl'
@@ -191,12 +192,11 @@ def project(
     target_features = vgg16(target_images, resize_images=False, return_lpips=True)
 
     # initalize optimizer
-    w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device, requires_grad=True) # pylint: disable=not-callable
     optimizer = torch.optim.Adam([w_opt], betas=(0.9, 0.999), lr=initial_learning_rate)
 
     # run optimization loop
     all_images = []
-    for step in range(num_steps):
+    for step in (pbar := trange(num_steps, desc='optimization Latent', unit='step')):
         # Learning rate schedule.
         t = step / num_steps
         lr_ramp = min(1.0, (1.0 - t) / lr_rampdown_length)
@@ -227,11 +227,9 @@ def project(
         loss = lpips_loss
         loss.backward()
         optimizer.step()
-        msg  = f'[ step {step+1:>4d}/{num_steps}] '
-        msg += f'[ loss: {float(loss):<5.2f}] '
-        if verbose: print(msg)
+        if verbose: pbar.set_postfix_str(f'loss: {float(loss):<5.2f}')
 
-    return all_images, w_opt.detach()[0]
+    return all_images, (w_opt.detach()[0] if w_start_pivot==None else w_opt)
 
 
 @click.command()
