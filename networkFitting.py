@@ -1,4 +1,4 @@
-import click, torch, sys, cv2, PIL, numpy as np, os, copy
+import click, torch, sys, cv2, PIL, numpy as np, os, copy, imageio, dill
 from time import perf_counter
 from tqdm import trange
 sys.path.insert(1, 'stylegan-xl')
@@ -59,7 +59,8 @@ def calculLatents(
     w_init_path:str=None,
     save_latent:bool=False,
     save_video_latent:bool=False,
-    outdir:str='out'
+    outdir:str='out',
+    ips:int=60
 ):
     w_pivots = []
     if w_init_path:
@@ -78,7 +79,7 @@ def calculLatents(
         )
         w_pivots.append(w_pivot)
         if save_latent:
-            np.savez(f'{opts.outdir}/latent{i}.npz', w=w_pivot.unsqueeze(0).cpu().detach().numpy())
+            np.savez(f'{outdir}/latent{i}.npz', w=w_pivot.unsqueeze(0).cpu().detach().numpy())
         if save_video_latent:
             w_imgs += imgs
             synth_image = G.synthesis(w_pivot.repeat(1, G.num_ws, 1))
@@ -87,11 +88,11 @@ def calculLatents(
             wrimgs.append(synth_image)
     
     if save_video_latent:
-        video = imageio.get_writer(f'{opts.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+        video = imageio.get_writer(f'{outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
         for synth_image in w_imgs:
             video.append_data(np.array(synth_image))
         video.close()
-        video = imageio.get_writer(f'{opts.outdir}/resultLatent.mp4', mode='I', fps=opts.v_fps, codec='libx264', bitrate='16M')
+        video = imageio.get_writer(f'{outdir}/resultLatent.mp4', mode='I', fps=ips, codec='libx264', bitrate='16M')
         for synth_image in wrimgs:
             video.append_data(np.array(synth_image))
         video.close()
@@ -111,7 +112,7 @@ def pti_multiple_targets(
     outdir:str = 'out'
 ):
     G_pti = copy.deepcopy(G).train().requires_grad_(True).to(device)
-    latents = gen_utils.get_w_from_seed(G, 1, device, seed=seed)
+    w_seed = gen_utils.get_w_from_seed(G, 1, device, seed=seed)
 
     # Load VGG16 feature detector.
     vgg16_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/vgg16.pkl'
@@ -129,7 +130,7 @@ def pti_multiple_targets(
     w_pivots[0].requires_grad_(False)
     for step in (pbar := trange(1,num_steps+1, desc='Optimization PTI', unit='step', disable=(not verbose))):
         if save_video:
-            synth_images = G_pti.synthesis(latents[0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
+            synth_images = G_pti.synthesis(w_seed, noise_mode=noise_mode)
             synth_images = (synth_images + 1) * (255/2)
             synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
             seed_images.append(synth_images_np)
@@ -205,7 +206,8 @@ def fitting(**kwargs):
         opts.w_init,
         opts.save_latent,
         opts.save_video_latent,
-        opts.outdir
+        opts.outdir,
+        opts.ips
     )
     G = pti_multiple_targets(
         G,
@@ -218,6 +220,10 @@ def fitting(**kwargs):
         save_video=opts.save_video,
         outdir=opts.outdir
     )
+    snapshot_data = {'G': G, 'G_ema': G}
+    with open(f"{opts.outdir}/network.pkl", 'wb') as f:
+        dill.dump(snapshot_data, f)
+    if opts.verbose : print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
     
 
 @click.command()
