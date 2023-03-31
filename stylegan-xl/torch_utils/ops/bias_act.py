@@ -35,7 +35,7 @@ activation_funcs = {
 _plugin = None
 _null_tensor = torch.empty([0])
 
-def _init():
+def _init(verbose:str='brief'):
     global _plugin
     if _plugin is None:
         _plugin = custom_ops.get_plugin(
@@ -44,6 +44,7 @@ def _init():
             headers=['bias_act.h'],
             source_dir=os.path.dirname(__file__),
             extra_cuda_cflags=['--use_fast_math'],
+            verbose=verbose
         )
     return True
 

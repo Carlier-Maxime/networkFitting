@@ -56,8 +56,8 @@ def _get_mangled_gpu_name():
 
 _cached_plugins = dict()
 
-def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwargs):
-    assert verbosity in ['none', 'brief', 'full']
+def get_plugin(module_name, sources, headers=None, source_dir=None, verbose:str=verbosity, **build_kwargs):
+    assert verbose in ['none', 'brief', 'full']
     if headers is None:
         headers = []
     if source_dir is not None:
@@ -69,11 +69,11 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
         return _cached_plugins[module_name]
 
     # Print status.
-    if verbosity == 'full':
+    if verbose == 'full':
         print(f'Setting up PyTorch plugin "{module_name}"...')
-    elif verbosity == 'brief':
+    elif verbose == 'brief':
         print(f'Setting up PyTorch plugin "{module_name}"... ', end='', flush=True)
-    verbose_build = (verbosity == 'full')
+    verbose_build = (verbose == 'full')
 
     # Compile and load.
     try: # pylint: disable=too-many-nested-blocks
@@ -142,14 +142,14 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
         module = importlib.import_module(module_name)
 
     except:
-        if verbosity == 'brief':
+        if verbose == 'brief':
             print('Failed!')
         raise
 
     # Print status and add to cache dict.
-    if verbosity == 'full':
+    if verbose == 'full':
         print(f'Done setting up PyTorch plugin "{module_name}".')
-    elif verbosity == 'brief':
+    elif verbose == 'brief':
         print('Done.')
     _cached_plugins[module_name] = module
     return module
