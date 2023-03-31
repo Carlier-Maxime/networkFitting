@@ -1,13 +1,6 @@
-import click, torch
-from importlib import __import__ as import_
-
-def fromImport(module:str, name:str):
-    return getattr(import_(module, fromlist=[name]),name)
-
-def importAll():
-    global dnnlib, legacy
-    dnnlib = fromImport('stylegan-xl','dnnlib')
-    legacy = fromImport('stylegan-xl','legacy')
+import click, torch, sys
+sys.path.insert(1, './stylegan-xl')
+import dnnlib, legacy
 
 def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
     if verbose: print('Loading networks from "%s"...' % network_pkl)
@@ -16,7 +9,6 @@ def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
         G = legacy.load_network_pkl(fp)['G_ema'].to(device) # type: ignore
 
 def fitting(**kwargs):
-    importAll() #import module with bad name
     opts = dnnlib.EasyDict(kwargs) #get options (arguments given)
     loadNetwork(opts.network_pkl, opts.device, opts.verbose)
 
