@@ -3,6 +3,7 @@ from time import perf_counter
 from tqdm import trange
 sys.path.insert(1, './stylegan-xl')
 import dnnlib, legacy
+from torch_utils.ops import filtered_lrelu, bias_act
 
 def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
     if verbose: print('Loading networks from "%s"...' % network_pkl)
@@ -41,12 +42,18 @@ def getImagesFromVideo(filename:str, ips:int, device:torch.device, verbose:bool=
         images.append(torch.tensor(img_np.transpose([2, 0, 1]), device=device))
     return images
 
+def initPlugins():
+    bias_act._init()
+    filtered_lrelu._init()
+
 def fitting(**kwargs):
     start_time = perf_counter()
     opts = dnnlib.EasyDict(kwargs)
     device = torch.device(opts.device)
     G = loadNetwork(opts.network_pkl, device, opts.verbose)
     images = getImagesFromVideo(opts.target_fname, opts.ips, device, opts.verbose, G.img_resolution)
+    initPlugins()
+    
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
