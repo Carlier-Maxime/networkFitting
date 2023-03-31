@@ -1,10 +1,12 @@
-import click, torch, sys, cv2, PIL, numpy as np, os
+import click, torch, sys, cv2, PIL, numpy as np, os, copy
 from time import perf_counter
 from tqdm import trange
 sys.path.insert(1, 'stylegan-xl')
 import dnnlib, legacy
 from torch_utils.ops import filtered_lrelu, bias_act
-from run_inversion import project
+from torch_utils import gen_utils
+from run_inversion import project, space_regularizer_loss
+from metrics import metric_utils
 
 def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
     if verbose: print('Loading networks from "%s"...' % network_pkl)
@@ -95,6 +97,96 @@ def calculLatents(
         video.close()
     return w_pivots
 
+def pti_multiple_targets(
+    G,
+    w_pivots,
+    targets,
+    device: torch.device,
+    num_steps=350,
+    learning_rate = 3e-4,
+    noise_mode="const",
+    verbose = False,
+    seed=64,
+    save_video = False,
+    outdir:str = 'out'
+):
+    G_pti = copy.deepcopy(G).train().requires_grad_(True).to(device)
+    latents = gen_utils.get_w_from_seed(G, 1, device, seed=seed)
+
+    # Load VGG16 feature detector.
+    vgg16_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/vgg16.pkl'
+    vgg16 = metric_utils.get_feature_detector(vgg16_url, device=device)
+
+    # l2 criterion
+    l2_criterion = torch.nn.MSELoss(reduction='mean')
+
+    # initalize optimizer
+    optimizer = torch.optim.Adam(G_pti.parameters(), lr=learning_rate)
+
+    # run optimization loop
+    seed_images = []
+    target_images = []
+    w_pivots[0].requires_grad_(False)
+    for step in (pbar := trange(1,num_steps+1, desc='Optimization PTI', unit='step', disable=(not verbose))):
+        if save_video:
+            synth_images = G_pti.synthesis(latents[0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
+            synth_images = (synth_images + 1) * (255/2)
+            synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+            seed_images.append(synth_images_np)
+
+            synth_images = G_pti.synthesis(w_pivots[0][0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
+            synth_images = (synth_images + 1) * (255/2)
+            synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+            target_images.append(synth_images_np)
+        
+        # Features for target image.
+        i=np.random.randint(len(targets))
+        target_image = targets[i].unsqueeze(0).to(device).to(torch.float32)
+        if target_image.shape[2] > 256:
+            target_image = F.interpolate(target_image, size=(256, 256), mode='area')
+        target_features = vgg16(target_image, resize_images=False, return_lpips=True)
+
+        # Synth images from opt_w.
+        w_pivots[i].requires_grad_(False)
+        synth_images = G_pti.synthesis(w_pivots[i][0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
+        synth_images = (synth_images + 1) * (255/2)
+
+        # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
+        if synth_images.shape[2] > 256:
+            synth_images = F.interpolate(synth_images, size=(256, 256), mode='area')
+
+        # LPIPS loss
+        synth_features = vgg16(synth_images, resize_images=False, return_lpips=True)
+        lpips_loss = (target_features - synth_features).square().sum()
+
+        # MSE loss
+        mse_loss = l2_criterion(target_image, synth_images)
+
+        # space regularizer
+        reg_loss = space_regularizer_loss(G_pti, G, w_pivots[i], vgg16).to(device)
+
+        # Step
+        optimizer.zero_grad(set_to_none=True)
+        loss = mse_loss + lpips_loss + reg_loss
+        loss.backward()
+        optimizer.step()
+
+        if verbose:
+            pbar.set_postfix_str(f'loss: {float(loss):<5.2f}, lpips: {float(lpips_loss):<5.2f}, mse: {float(mse_loss):<5.2f}, reg: {float(reg_loss):<5.2f}')
+
+    if save_video:
+        print (f'Saving network fitting progress video "{outdir}/fitting_seed.mp4" and "{outdir}/fitting_target.mp4"')
+        video = imageio.get_writer(f'{outdir}/fitting_seed.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+        for synth_image in seed_images:
+            video.append_data(synth_image)
+        video.close()
+        video = imageio.get_writer(f'{outdir}/fitting_target.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+        for synth_image in target_images:
+            video.append_data(synth_image)
+        video.close()
+
+    return G_pti
+
 def fitting(**kwargs):
     start_time = perf_counter()
     opts = dnnlib.EasyDict(kwargs)
@@ -103,7 +195,29 @@ def fitting(**kwargs):
     images = getImagesFromVideo(opts.target_fname, opts.ips, device, opts.verbose, G.img_resolution)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    w_pivots = calculLatents(G,images,device,opts.first_inv_steps,opts.inv_steps,opts.w_init,opts.save_latent,opts.save_video_latent,opts.outdir)
+    w_pivots = calculLatents(
+        G,
+        images,
+        device,
+        opts.
+        first_inv_steps,
+        opts.inv_steps,
+        opts.w_init,
+        opts.save_latent,
+        opts.save_video_latent,
+        opts.outdir
+    )
+    G = pti_multiple_targets(
+        G,
+        w_pivots,
+        images,
+        device,
+        opts.pti_steps,
+        verbose=opts.verbose,
+        seed=opts.seed,
+        save_video=opts.save_video,
+        outdir=opts.outdir
+    )
     
 
 @click.command()
