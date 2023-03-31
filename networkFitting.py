@@ -1,15 +1,24 @@
-import click
+import click, torch
 from importlib import __import__ as import_
 
+def fromImport(module:str, name:str):
+    return getattr(import_(module, fromlist=[name]),name)
+
 def importAll():
-    global dnnlib
-    dnnlib = getattr(import_('stylegan-xl',fromlist=['dnnlib']),'dnnlib')
+    global dnnlib, legacy
+    dnnlib = fromImport('stylegan-xl','dnnlib')
+    legacy = fromImport('stylegan-xl','legacy')
+
+def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
+    if verbose: print('Loading networks from "%s"...' % network_pkl)
+    device = torch.device(device)
+    with dnnlib.util.open_url(network_pkl) as fp:
+        G = legacy.load_network_pkl(fp)['G_ema'].to(device) # type: ignore
 
 def fitting(**kwargs):
     importAll() #import module with bad name
     opts = dnnlib.EasyDict(kwargs) #get options (arguments given)
-    print(opts.network_pkl, opts.target_fname, opts.save_video, opts.outdir)
-    print('fitting..')
+    loadNetwork(opts.network_pkl, opts.device, opts.verbose)
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
@@ -24,6 +33,8 @@ def fitting(**kwargs):
 @click.option('--w-init', help='path to inital latent', type=str, default='', show_default=True)
 @click.option('--pti-steps', help='Number of pti steps', type=int, default=2500, show_default=True)
 @click.option('--v-fps', help='The number of frame used in one second of video', type=int, default=10, show_default=True)
+@click.option('--not-verbose', 'verbose', help='this flag disable the verbose mode', default=True, is_flag=True)
+@click.option('--device', help='torch device used', default='cuda', metavar='torch.device')
 def main(**kwargs):
     fitting(**kwargs)
 
