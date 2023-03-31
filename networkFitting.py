@@ -42,9 +42,10 @@ def getImagesFromVideo(filename:str, ips:int, device:torch.device, verbose:bool=
         images.append(torch.tensor(img_np.transpose([2, 0, 1]), device=device))
     return images
 
-def initPlugins():
-    bias_act._init()
-    filtered_lrelu._init()
+def initPlugins(verbose:bool=True):
+    verbosity = 'brief' if verbose else 'none'
+    bias_act._init(verbosity)
+    filtered_lrelu._init(verbosity)
 
 def fitting(**kwargs):
     start_time = perf_counter()
@@ -52,7 +53,7 @@ def fitting(**kwargs):
     device = torch.device(opts.device)
     G = loadNetwork(opts.network_pkl, device, opts.verbose)
     images = getImagesFromVideo(opts.target_fname, opts.ips, device, opts.verbose, G.img_resolution)
-    initPlugins()
+    initPlugins(opts.verbose)
     
 
 @click.command()
