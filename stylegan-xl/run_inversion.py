@@ -37,6 +37,7 @@ def space_regularizer_loss(
     vgg16,
     num_of_sampled_latents=1,
     lpips_lambda=10,
+    disable_gradient:bool=False
 ):
 
     z_samples = np.random.randn(num_of_sampled_latents, G_original.z_dim)
@@ -52,8 +53,9 @@ def space_regularizer_loss(
     territory_indicator_ws = [get_morphed_w_code(w_code.unsqueeze(0), w_batch) for w_code in w_samples]
 
     for w_code in territory_indicator_ws:
-        new_img = G_pti.synthesis(w_code, noise_mode='none', force_fp32=True)
+        if not disable_gradient: new_img = G_pti.synthesis(w_code, noise_mode='none', force_fp32=True)
         with torch.no_grad():
+            if disable_gradient: new_img = G_pti.synthesis(w_code, noise_mode='none', force_fp32=True)
             old_img = G_original.synthesis(w_code, noise_mode='none', force_fp32=True)
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.

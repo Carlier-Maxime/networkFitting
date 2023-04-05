@@ -109,7 +109,8 @@ def pti_multiple_targets(
     verbose = False,
     seed=64,
     save_video = False,
-    outdir:str = 'out'
+    outdir:str = 'out',
+    disable_gradient_reg_loss:bool = False
 ):
     G_pti = copy.deepcopy(G).train().requires_grad_(True).to(device)
     w_seed = gen_utils.get_w_from_seed(G, 1, device, seed=seed)
@@ -164,7 +165,7 @@ def pti_multiple_targets(
         mse_loss = l2_criterion(target_image, synth_images)
 
         # space regularizer
-        reg_loss = space_regularizer_loss(G_pti, G, w_pivots[i], vgg16).to(device)
+        reg_loss = space_regularizer_loss(G_pti, G, w_pivots[i], vgg16, disable_gradient=disable_gradient_reg_loss).to(device)
 
         # Step
         optimizer.zero_grad(set_to_none=True)
@@ -232,7 +233,8 @@ def fitting(**kwargs):
         verbose=opts.verbose,
         seed=opts.seed,
         save_video=opts.save_video,
-        outdir=opts.outdir
+        outdir=opts.outdir,
+        disable_gradient_reg_loss=opts.disable_gradient_reg_loss
     )
     snapshot_data = {'G': G, 'G_ema': G}
     with open(f"{opts.outdir}/network.pkl", 'wb') as f:
@@ -255,6 +257,7 @@ def fitting(**kwargs):
 @click.option('--ips', help='The number of image used in one second of video', type=int, default=10, show_default=True)
 @click.option('--not-verbose', 'verbose', help='this flag disable the verbose mode', default=True, is_flag=True)
 @click.option('--device', help='torch device used', default='cuda', metavar='torch.device')
+@click.option('--disable-gradient-reg-loss', help='disable gradient reg loss (not recommanded (quality of fitting is degraded), use only if you have out of memory)', default=False, is_flag=True)
 def main(**kwargs):
     fitting(**kwargs)
 
