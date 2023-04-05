@@ -188,12 +188,26 @@ def pti_multiple_targets(
 
     return G_pti
 
+def getImagesFromDir(directory:str, device:torch.device, verbose:bool=True, dezired_size:int=-1):
+    images = []
+    for entry in os.scandir(directory):
+        target_pil = PIL.Image.open(entry.path).convert('RGB')
+        w, h = target_pil.size
+        s = min(w, h)
+        target_pil = target_pil.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
+        if dezired_size<=0: dezired_size=s
+        target_pil = target_pil.resize((dezired_size, dezired_size), PIL.Image.LANCZOS)
+        img_np = np.array(target_pil, dtype=np.uint8)
+        images.append(torch.tensor(img_np.transpose([2, 0, 1]), device=device))
+    return images
+
 def fitting(**kwargs):
     start_time = perf_counter()
     opts = dnnlib.EasyDict(kwargs)
     device = torch.device(opts.device)
     G = loadNetwork(opts.network_pkl, device, opts.verbose)
-    images = getImagesFromVideo(opts.target_fname, opts.ips, device, opts.verbose, G.img_resolution)
+    if os.path.isdir(opts.target_fname): images = getImagesFromDir(opts.target_fname, device, opts.verbose, G.img_resolution)
+    else: images = getImagesFromVideo(opts.target_fname, opts.ips, device, opts.verbose, G.img_resolution)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
     w_pivots = calculLatents(
@@ -228,7 +242,7 @@ def fitting(**kwargs):
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
-@click.option('--target', 'target_fname', help='Target video file to project to', required=True, metavar='FILE')
+@click.option('--target', 'target_fname', help='Target video file or directory content target images', required=True, metavar='FILE')
 @click.option('--seed', help='Random seed', type=int, default=64, show_default=True)
 @click.option('--save-video', help='Save an mp4 video of fitting progress', type=bool, default=False, show_default=True, is_flag=True)
 @click.option('--save-latent', help='Save latent in file npz', type=bool, default=False, show_default=True, is_flag=True)
