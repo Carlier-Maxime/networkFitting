@@ -109,6 +109,7 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
             ctx.save_for_backward(
                 input if weight.requires_grad else _null_tensor,
                 weight if input.requires_grad else _null_tensor,
+                bias
             )
             ctx.input_shape = input.shape
 
@@ -128,7 +129,7 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
 
         @staticmethod
         def backward(ctx, grad_output):
-            input, weight = ctx.saved_tensors
+            input, weight, bias = ctx.saved_tensors
             input_shape = ctx.input_shape
             grad_input = None
             grad_weight = None
@@ -141,7 +142,7 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
                 assert grad_input.shape == input_shape
 
             if ctx.needs_input_grad[1] and not weight_gradients_disabled:
-                grad_weight = Conv2dGradWeight.apply(grad_output, input)
+                grad_weight = Conv2dGradWeight.apply(grad_output, input, bias)
                 assert grad_weight.shape == weight_shape
 
             if ctx.needs_input_grad[2]:
@@ -152,10 +153,11 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
     # Gradient with respect to the weights.
     class Conv2dGradWeight(torch.autograd.Function):
         @staticmethod
-        def forward(ctx, grad_output, input):
+        def forward(ctx, grad_output, input, bias):
             ctx.save_for_backward(
                 grad_output if input.requires_grad else _null_tensor,
                 input if grad_output.requires_grad else _null_tensor,
+                bias
             )
             ctx.grad_output_shape = grad_output.shape
             ctx.input_shape = input.shape
@@ -168,9 +170,12 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
                 return c.contiguous(memory_format=(torch.channels_last if input.stride(1) == 1 else torch.contiguous_format))
 
             # General case => cuDNN.
-            name = 'aten::cudnn_convolution_transpose_backward_weight' if transpose else 'aten::cudnn_convolution_backward_weight'
-            flags = [torch.backends.cudnn.benchmark, torch.backends.cudnn.deterministic, torch.backends.cudnn.allow_tf32]
-            return torch._C._jit_get_operation(name)(weight_shape, grad_output, input, padding, stride, dilation, groups, *flags)
+            convolution_backward = torch.ops.aten.convolution_backward
+            #flags = [torch.backends.cudnn.benchmark, torch.backends.cudnn.deterministic, torch.backends.cudnn.allow_tf32]
+            #return convolution_backward(weight_shape, grad_output, input, padding, stride, dilation, groups, *flags)
+            bias_shape = bias.shape if bias is not None else None
+            empty_weight = torch.tensor(0.0, dtype=input.dtype, device=input.device).expand(weight_shape)
+            return convolution_backward(grad_output, input, empty_weight, bias_shape, stride, padding, dilation, transpose, output_padding, groups, [0,1,0])[1]
 
         @staticmethod
         def backward(ctx, grad2_grad_weight):
