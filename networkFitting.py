@@ -11,6 +11,7 @@ from run_inversion import project, space_regularizer_loss
 from metrics import metric_utils
 
 from utils.ImagesDataset import ImagesDataset
+from coaches.multi_id_coach import MultiIDCoach
 
 def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
     if verbose: print('Loading networks from "%s"...' % network_pkl)
@@ -250,6 +251,8 @@ def fitting(**kwargs):
         outdir=opts.outdir,
         disable_gradient_reg_loss=opts.disable_gradient_reg_loss
     )
+    #coache = MultiIDCoach(dataloader)
+    #coache.train()
     snapshot_data = {'G': G, 'G_ema': G}
     with open(f"{opts.outdir}/network.pkl", 'wb') as f:
         dill.dump(snapshot_data, f)
