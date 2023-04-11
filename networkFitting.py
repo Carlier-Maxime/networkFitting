@@ -1,12 +1,16 @@
 import click, torch, sys, cv2, PIL, numpy as np, os, copy, imageio, dill
 from time import perf_counter
-from tqdm import trange
+from tqdm import tqdm,trange
+from torch.utils.data import DataLoader
+from torchvision.transforms import transforms
 sys.path.insert(1, 'stylegan-xl')
 import dnnlib, legacy
 from torch_utils.ops import filtered_lrelu, bias_act
 from torch_utils import gen_utils
 from run_inversion import project, space_regularizer_loss
 from metrics import metric_utils
+
+from utils.ImagesDataset import ImagesDataset
 
 def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
     if verbose: print('Loading networks from "%s"...' % network_pkl)
@@ -52,7 +56,7 @@ def initPlugins(verbose:bool=True):
 
 def calculLatents(
     G,
-    images,
+    dataloader:DataLoader,
     device:torch.device,
     first_inv_steps:int=1000,
     inv_steps:int=100,
@@ -67,10 +71,10 @@ def calculLatents(
         w_pivots.append(torch.from_numpy(np.load(w_init_path)['w'])[0].to(device))
     w_imgs = []
     wrimgs = []
-    for i in trange(len(images), desc='Calcul latents', unit='image'):
+    for name,img in tqdm(dataloader, desc='Calcul latents', unit='image'):
         imgs, w_pivot = project(
             G,
-            target=images[i], # pylint: disable=not-callable
+            target=img[0], # pylint: disable=not-callable
             num_steps=(inv_steps if len(w_pivots)>0 else first_inv_steps),
             device=device,
             verbose=True,
@@ -79,7 +83,7 @@ def calculLatents(
         )
         w_pivots.append(w_pivot)
         if save_latent:
-            np.savez(f'{outdir}/latent{i}.npz', w=w_pivot.unsqueeze(0).cpu().detach().numpy())
+            np.savez(f'{outdir}/latent{name[0]}.npz', w=w_pivot.unsqueeze(0).cpu().detach().numpy())
         if save_video_latent:
             w_imgs += imgs
             synth_image = G.synthesis(w_pivot.repeat(1, G.num_ws, 1))
@@ -101,7 +105,7 @@ def calculLatents(
 def pti_multiple_targets(
     G,
     w_pivots,
-    targets,
+    dataloader:DataLoader,
     device: torch.device,
     num_steps=350,
     learning_rate = 3e-4,
@@ -129,6 +133,8 @@ def pti_multiple_targets(
     seed_images = []
     target_images = []
     w_pivots[0].requires_grad_(False)
+    i=0
+    iterator = iter(dataloader)
     for step in (pbar := trange(1,num_steps+1, desc='Optimization PTI', unit='step', disable=(not verbose))):
         if save_video:
             synth_images = G_pti.synthesis(w_seed, noise_mode=noise_mode)
@@ -142,15 +148,17 @@ def pti_multiple_targets(
             target_images.append(synth_images_np)
         
         # Features for target image.
-        i=np.random.randint(len(targets))
-        target_image = targets[i].unsqueeze(0).to(device).to(torch.float32)
+        try: target_image = next(iterator)[1][0].unsqueeze(0).to(device).to(torch.float32)
+        except:
+            iterator = iter(dataloader)
+            target_image = next(iterator)[1][0].unsqueeze(0).to(device).to(torch.float32)
         if target_image.shape[2] > 256:
             target_image = F.interpolate(target_image, size=(256, 256), mode='area')
         target_features = vgg16(target_image, resize_images=False, return_lpips=True)
 
         # Synth images from opt_w.
-        w_pivots[i].requires_grad_(False)
-        synth_images = G_pti.synthesis(w_pivots[i][0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
+        w_pivots[i%len(w_pivots)].requires_grad_(False)
+        synth_images = G_pti.synthesis(w_pivots[i%len(w_pivots)][0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
         synth_images = (synth_images + 1) * (255/2)
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
@@ -165,13 +173,14 @@ def pti_multiple_targets(
         mse_loss = l2_criterion(target_image, synth_images)
 
         # space regularizer
-        reg_loss = space_regularizer_loss(G_pti, G, w_pivots[i], vgg16, disable_gradient=disable_gradient_reg_loss).to(device)
+        reg_loss = space_regularizer_loss(G_pti, G, w_pivots[i%len(w_pivots)], vgg16, disable_gradient=disable_gradient_reg_loss).to(device)
 
         # Step
         optimizer.zero_grad(set_to_none=True)
         loss = mse_loss + lpips_loss + reg_loss
         loss.backward()
         optimizer.step()
+        i+=1
 
         if verbose:
             pbar.set_postfix_str(f'loss: {float(loss):<5.2f}, lpips: {float(lpips_loss):<5.2f}, mse: {float(mse_loss):<5.2f}, reg: {float(reg_loss):<5.2f}')
@@ -207,16 +216,21 @@ def fitting(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
     device = torch.device(opts.device)
     G = loadNetwork(opts.network_pkl, device, opts.verbose)
-    if os.path.isdir(opts.target_fname): images = getImagesFromDir(opts.target_fname, device, opts.verbose, G.img_resolution)
-    else: images = getImagesFromVideo(opts.target_fname, opts.ips, device, opts.verbose, G.img_resolution)
+    dataset = ImagesDataset(
+        opts.target_fname,
+        None,
+        G.img_resolution,
+        opts.ips,
+        opts.verbose
+    )
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
     w_pivots = calculLatents(
         G,
-        images,
+        dataloader,
         device,
-        opts.
-        first_inv_steps,
+        opts.first_inv_steps,
         opts.inv_steps,
         opts.w_init,
         opts.save_latent,
@@ -227,7 +241,7 @@ def fitting(**kwargs):
     G = pti_multiple_targets(
         G,
         w_pivots,
-        images,
+        dataloader,
         device,
         opts.pti_steps,
         verbose=opts.verbose,

@@ -155,7 +155,7 @@ def project(
     noise_mode="const",
     w_start_pivot=None
 ):
-    assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
+    assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution), f"the shape not equals : {target.shape} and {(G.img_channels, G.img_resolution, G.img_resolution)}"
 
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device) # type: ignore
 
