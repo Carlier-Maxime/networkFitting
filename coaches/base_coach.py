@@ -9,69 +9,52 @@ from torchvision import transforms
 from lpips import LPIPS
 from configs import global_config, paths_config, hyperparameters
 from criteria import l2_loss
-from utils.models_utils import toogle_grad, load_old_G
+from utils.models_utils import toogle_grad, load_network
 import sys
 sys.path.insert(1, 'stylegan-xl')
 from run_inversion import project
+from torch_utils import gen_utils
 
 class BaseCoach:
-    def __init__(self, data_loader):
+    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64):
+        self.device = device
         self.data_loader = data_loader
+        self.network_path = network_path
+        self.outdir = outdir
+        self.save_latent = save_latent
+        self.save_video_latent = save_video_latent
+        self.save_video_pti = save_video_pti
         self.w_pivots = {}
         self.image_counter = 0
-
-        # Initialize loss
-        self.lpips_loss = LPIPS(net=hyperparameters.lpips_type).to(global_config.device).eval()
-
+        self.lpips_loss = LPIPS(net=hyperparameters.lpips_type).to(device).eval()
         self.restart_training()
-
-        # Initialize checkpoint dir
-        self.checkpoint_dir = paths_config.checkpoints_dir
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        self.w_seed = gen_utils.get_w_from_seed(self.G, 1, device, seed=seed)
+        os.makedirs(self.outdir, exist_ok=True)
 
     def restart_training(self):
 
         # Initialize networks
-        self.G = load_old_G()
+        self.G = load_network(self.network_path, self.device)
         toogle_grad(self.G, True)
 
-        self.original_G = load_old_G()
+        self.original_G = load_network(self.network_path, self.device)
 
         self.space_regulizer = Space_Regulizer(self.original_G, self.lpips_loss)
         self.optimizer = self.configure_optimizers()
 
-    def get_inversion(self, w_path_dir, image_name, image):
-        embedding_dir = f'{w_path_dir}/{paths_config.pti_results_keyword}/{image_name}'
-        os.makedirs(embedding_dir, exist_ok=True)
-
-        w_pivot = None
-
-        if hyperparameters.use_last_w_pivots:
-            w_pivot = self.load_inversions(w_path_dir, image_name)
-
-        if not hyperparameters.use_last_w_pivots or w_pivot is None:
-            w_pivot = self.calc_inversions(image, image_name)
-            torch.save(w_pivot, f'{embedding_dir}/0.pt')
-
-        w_pivot = w_pivot.to(global_config.device)
-        return w_pivot
-
-    def load_inversions(self, w_path_dir, image_name):
+    def load_inversions(self, image_name):
         if image_name in self.w_pivots:
             return self.w_pivots[image_name]
 
-        w_potential_path = f'{w_path_dir}/{paths_config.pti_results_keyword}/{image_name}/0.pt'
+        w_potential_path = f'{self.outdir}/latent_{image_name}.pt'
         if not os.path.isfile(w_potential_path):
             return None
-        w = torch.load(w_potential_path).to(global_config.device)
+        w = torch.load(w_potential_path).to(self.device)
         self.w_pivots[image_name] = w
         return w
 
-    def calc_inversions(self, image, image_name):
-        id_image = torch.squeeze((image.to(global_config.device) + 1) / 2) * 255
-        imgs, w = project(self.G, id_image, device=torch.device(global_config.device), w_avg_samples=600,
-                                num_steps=hyperparameters.first_inv_steps)
-        return w
+    def calc_inversions(self, image, num_steps, w_start_pivot=None):
+        return project(self.G, image[0], device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot)
 
     @abc.abstractmethod
     def train(self):

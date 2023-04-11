@@ -1,42 +1,65 @@
 import os
-
-import torch
+import torch, imageio
+import numpy as np
 from tqdm import tqdm
 from configs import paths_config, hyperparameters, global_config
 from coaches.base_coach import BaseCoach
 
 class MultiIDCoach(BaseCoach):
 
-    def __init__(self, data_loader):
-        super().__init__(data_loader)
+    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64):
+        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, seed)
 
-    def train(self):
+    def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500):
         self.G.synthesis.train()
         self.G.mapping.train()
-
-        w_path_dir = f'{paths_config.embedding_base_dir}/{paths_config.input_data_id}'
-        os.makedirs(w_path_dir, exist_ok=True)
-        os.makedirs(f'{w_path_dir}/{paths_config.pti_results_keyword}', exist_ok=True)
 
         use_ball_holder = True
         w_pivots = []
         images = []
+        w_imgs = []
+        wrimgs = []
 
         for fname, image in self.data_loader:
             if self.image_counter >= hyperparameters.max_images_to_invert:
                 break
-
             image_name = fname[0]
-            embedding_dir = f'{w_path_dir}/{paths_config.pti_results_keyword}/{image_name}'
-            os.makedirs(embedding_dir, exist_ok=True)
-
-            w_pivot = self.get_inversion(w_path_dir, image_name, image)
+            if hyperparameters.use_last_w_pivots:
+                w_pivot = self.load_inversions(image_name)
+            elif not hyperparameters.use_last_w_pivots or w_pivot is None:
+                imgs, w_pivot = self.calc_inversions(image, (inv_steps if len(w_pivots)>0 else first_inv_steps), w_start_pivot=(w_pivots[-1] if len(w_pivots)>0 else None))
+                if self.save_video_latent:
+                    w_imgs += imgs
+                    wrimgs.append(imgs[-1])
             w_pivots.append(w_pivot)
             images.append((image_name, image))
             self.image_counter += 1
+        if self.save_video_latent:
+            video = imageio.get_writer(f'{self.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+            for synth_image in w_imgs:
+                video.append_data(np.array(synth_image))
+            video.close()
+            video = imageio.get_writer(f'{self.outdir}/resultLatent.mp4', mode='I', fps=3, codec='libx264', bitrate='16M')
+            for synth_image in wrimgs:
+                video.append_data(np.array(synth_image))
+            video.close()
 
-        for i in tqdm(range(hyperparameters.max_pti_steps)):
+        seed_images = []
+        target_images = [] 
+        for i in tqdm(range(pti_steps)):
             self.image_counter = 0
+            if self.save_video_pti:
+                synth_images = self.forward(self.w_seed)
+                synth_images = (synth_images + 1) * (255/2)
+                synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+                seed_images.append(synth_images_np)
+                del synth_images
+
+                synth_images = self.forward(w_pivots[0][0].repeat(1,self.G.num_ws,1))
+                synth_images = (synth_images + 1) * (255/2)
+                synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+                target_images.append(synth_images_np)
+                del synth_images
 
             for data, w_pivot in zip(images, w_pivots):
                 image_name, image = data
@@ -44,10 +67,14 @@ class MultiIDCoach(BaseCoach):
                 if self.image_counter >= hyperparameters.max_images_to_invert:
                     break
 
-                real_images_batch = image.to(global_config.device)
+                real_images_batch = image.to(self.device)
 
-                generated_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
-                loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, real_images_batch, image_name,
+                synth_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
+                print(synth_images.shape, real_images_batch.shape)
+                print(synth_images)
+                print(real_images_batch)
+                exit(1)
+                loss, l2_loss_val, loss_lpips = self.calc_loss(synth_images, real_images_batch, image_name,
                                       self.G, use_ball_holder, w_pivot)
 
                 self.optimizer.zero_grad()
@@ -59,5 +86,15 @@ class MultiIDCoach(BaseCoach):
                 global_config.training_step += 1
                 self.image_counter += 1
 
-        torch.save(self.G,
-                   f'{paths_config.checkpoints_dir}/model_{global_config.run_name}_multi_id.pt')
+        if self.save_video_pti:
+            print (f'Saving network fitting progress video "{self.outdir}/fitting_seed.mp4" and "{self.outdir}/fitting_target.mp4"')
+            video = imageio.get_writer(f'{self.outdir}/fitting_seed.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+            for synth_image in seed_images:
+                video.append_data(synth_image)
+            video.close()
+            video = imageio.get_writer(f'{self.outdir}/fitting_target.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+            for synth_image in target_images:
+                video.append_data(synth_image)
+            video.close()
+
+        torch.save(self.G, f'{self.outdir}/network.pt')

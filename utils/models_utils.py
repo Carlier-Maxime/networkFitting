@@ -18,12 +18,12 @@ def load_tuned_G(run_id, type):
     return new_G
 
 
-def load_old_G():
-    old_G = None
-    with open(paths_config.stylegan2_ada_ffhq, 'rb') as f:
-        if paths_config.stylegan2_ada_ffhq.endswith(".pkl"):
-            old_G = pickle.load(f)['G_ema'].to(global_config.device).eval()
-            old_G = old_G.float()
-        elif paths_config.stylegan2_ada_ffhq.endswith(".pt"):
-            old_G = torch.load(f).cuda()
-    return old_G
+def load_network(path, device:torch.device):
+    G = None
+    with open(path, 'rb') as f:
+        if path.endswith(".pkl"):
+            G = pickle.load(f)['G_ema'].to(device).eval()
+            G = G.float()
+        elif path.endswith(".pt"):
+            G = torch.load(f).to(device)
+    return G

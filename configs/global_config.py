@@ -1,6 +1,5 @@
 ## Device
 cuda_visible_devices = '0'
-device = 'cuda:0'
 
 ## Logs
 training_step = 1
