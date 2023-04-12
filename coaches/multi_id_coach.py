@@ -27,7 +27,7 @@ class MultiIDCoach(BaseCoach):
             if hyperparameters.use_last_w_pivots:
                 w_pivot = self.load_inversions(image_name)
             elif not hyperparameters.use_last_w_pivots or w_pivot is None:
-                imgs, w_pivot = self.calc_inversions(image, (inv_steps if len(w_pivots)>0 else first_inv_steps), w_start_pivot=(w_pivots[-1] if len(w_pivots)>0 else None))
+                imgs, w_pivot = self.calc_inversions(image, (inv_steps if len(w_pivots)>0 else first_inv_steps), w_start_pivot=(w_pivots[-1] if len(w_pivots)>0 else self.w_seed))
                 if self.save_video_latent:
                     w_imgs += imgs
                     wrimgs.append(imgs[-1])
