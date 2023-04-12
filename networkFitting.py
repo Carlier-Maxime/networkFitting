@@ -182,7 +182,7 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.seed, G=G)
+    coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.seed, G=G, verbose=opts.verbose)
     coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps)
     if opts.verbose : print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
     

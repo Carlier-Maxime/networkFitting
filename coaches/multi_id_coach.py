@@ -7,8 +7,8 @@ from coaches.base_coach import BaseCoach
 
 class MultiIDCoach(BaseCoach):
 
-    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None):
-        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, seed, G)
+    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None, verbose:bool=True):
+        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, seed, G, verbose)
 
     def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500):
         self.G.synthesis.train()
@@ -20,7 +20,7 @@ class MultiIDCoach(BaseCoach):
         w_imgs = []
         wrimgs = []
 
-        for fname, image in tqdm(self.data_loader, desc='calcul latents', unit='image'):
+        for fname, image in tqdm(self.data_loader, desc='calcul latents', unit='image', disable=(not self.verbose)):
             if self.image_counter >= hyperparameters.max_images_to_invert:
                 break
             image_name = fname[0]
@@ -35,7 +35,7 @@ class MultiIDCoach(BaseCoach):
             images.append((image_name, image))
             self.image_counter += 1
         if self.save_video_latent:
-            print("Saving optimization latent video..")
+            if self.verbose: print("Saving optimization latent video..")
             video = imageio.get_writer(f'{self.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
             for synth_image in w_imgs:
                 video.append_data(np.array(synth_image))
@@ -48,7 +48,7 @@ class MultiIDCoach(BaseCoach):
         seed_images = []
         target_images = []
         step_loss = []
-        for i in (pbar := tqdm(range(pti_steps), desc='pivotal tuning', unit='step', postfix='loss: ?')):
+        for i in (pbar := tqdm(range(pti_steps), desc='pivotal tuning', unit='step', postfix='loss: ?', disable=(not self.verbose))):
             self.image_counter = 0
             if self.save_video_pti:
                 synth_images = self.forward(self.w_seed)
@@ -63,7 +63,7 @@ class MultiIDCoach(BaseCoach):
                 target_images.append(synth_images_np)
                 del synth_images
 
-            for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='PTI', unit='image'):
+            for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='PTI', unit='image', disable=(not self.verbose)):
                 image_name, image = data
                 if self.image_counter >= hyperparameters.max_images_to_invert:
                     break
@@ -86,7 +86,7 @@ class MultiIDCoach(BaseCoach):
             pbar.set_postfix_str(f'loss: {np.mean(step_loss):<5.2f}')
 
         if self.save_video_pti:
-            print (f'Saving network fitting progress video "{self.outdir}/fitting_seed.mp4" and "{self.outdir}/fitting_target.mp4"')
+            if self.verbose: print (f'Saving network fitting progress video "{self.outdir}/fitting_seed.mp4" and "{self.outdir}/fitting_target.mp4"')
             video = imageio.get_writer(f'{self.outdir}/fitting_seed.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
             for synth_image in seed_images:
                 video.append_data(synth_image)

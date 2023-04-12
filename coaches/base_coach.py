@@ -16,7 +16,7 @@ from run_inversion import project
 from torch_utils import gen_utils
 
 class BaseCoach:
-    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None):
+    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None, verbose:bool=True):
         self.device = device
         self.data_loader = data_loader
         self.network_path = network_path
@@ -26,10 +26,11 @@ class BaseCoach:
         self.save_video_pti = save_video_pti
         self.w_pivots = {}
         self.image_counter = 0
-        self.lpips_loss = LPIPS(net=hyperparameters.lpips_type).to(device).eval()
+        self.lpips_loss = LPIPS(net=hyperparameters.lpips_type, verbose=verbose).to(device).eval()
         self.restart_training(G=G)
         self.seed = seed
         self.w_seed = gen_utils.get_w_from_seed(self.G, 1, device, seed=seed)
+        self.verbose = verbose
         os.makedirs(self.outdir, exist_ok=True)
 
     def restart_training(self, G=None):
@@ -56,7 +57,7 @@ class BaseCoach:
 
     def calc_inversions(self, image, num_steps, w_start_pivot=None, seed:int=64):
         id_image = torch.squeeze((image.to(self.device) + 1) / 2) * 255
-        return project(self.G, id_image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=True)
+        return project(self.G, id_image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose)
 
     @abc.abstractmethod
     def train(self):
