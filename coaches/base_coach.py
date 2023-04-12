@@ -54,7 +54,8 @@ class BaseCoach:
         return w
 
     def calc_inversions(self, image, num_steps, w_start_pivot=None):
-        return project(self.G, image[0], device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot)
+        id_image = torch.squeeze((image.to(self.device) + 1) / 2) * 255
+        return project(self.G, id_image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot)
 
     @abc.abstractmethod
     def train(self):

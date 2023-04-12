@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from torch.utils.data import Dataset
-from torchvision.transforms.functional import convert_image_dtype
+from torchvision.transforms import transforms
 from PIL import Image
 import torch
 
@@ -26,5 +26,4 @@ class ImagesDataset(Dataset):
         from_im = from_im.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
         if self.dezired_size<=0: self.dezired_size=s
         from_im = from_im.resize((self.dezired_size, self.dezired_size), Image.LANCZOS)
-        from_im = np.array(from_im, dtype=np.float32)
-        return fname, torch.tensor(from_im.transpose([2, 0, 1]))
+        return fname, transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])(from_im)

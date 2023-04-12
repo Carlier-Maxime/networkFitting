@@ -2,7 +2,6 @@ import os
 import torch, imageio
 import numpy as np
 from tqdm import tqdm
-from torchvision.transforms import transforms
 from configs import paths_config, hyperparameters, global_config
 from coaches.base_coach import BaseCoach
 
@@ -68,7 +67,7 @@ class MultiIDCoach(BaseCoach):
                 if self.image_counter >= hyperparameters.max_images_to_invert:
                     break
 
-                real_images_batch = (image.to(self.device) / (255/2))-1
+                real_images_batch = image.to(self.device)
                 synth_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
                 loss, l2_loss_val, loss_lpips = self.calc_loss(synth_images, real_images_batch, image_name,
                                       self.G, use_ball_holder, w_pivot)
