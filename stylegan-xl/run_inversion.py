@@ -153,14 +153,15 @@ def project(
     verbose = False,
     device: torch.device,
     noise_mode="const",
-    w_start_pivot=None
+    w_start_pivot=None,
+    seed:int=64
 ):
     assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution), f"the shape not equals : {target.shape} and {(G.img_channels, G.img_resolution, G.img_resolution)}"
 
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device) # type: ignore
 
     if w_start_pivot==None:
-        z_samples = torch.from_numpy(np.random.RandomState(123).randn(w_avg_samples, G.z_dim)).to(device)
+        z_samples = torch.from_numpy(np.random.RandomState(seed).randn(w_avg_samples, G.z_dim)).to(device)
         if not G.c_dim:
             c_samples = None
         else:
@@ -198,7 +199,7 @@ def project(
 
     # run optimization loop
     all_images = []
-    for step in (pbar := trange(num_steps, desc='optimization Latent', unit='step')):
+    for step in (pbar := trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))):
         # Learning rate schedule.
         t = step / num_steps
         lr_ramp = min(1.0, (1.0 - t) / lr_rampdown_length)

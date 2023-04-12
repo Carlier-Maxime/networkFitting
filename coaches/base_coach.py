@@ -28,6 +28,7 @@ class BaseCoach:
         self.image_counter = 0
         self.lpips_loss = LPIPS(net=hyperparameters.lpips_type).to(device).eval()
         self.restart_training(G=G)
+        self.seed = seed
         self.w_seed = gen_utils.get_w_from_seed(self.G, 1, device, seed=seed)
         os.makedirs(self.outdir, exist_ok=True)
 
@@ -53,9 +54,9 @@ class BaseCoach:
         self.w_pivots[image_name] = w
         return w
 
-    def calc_inversions(self, image, num_steps, w_start_pivot=None):
+    def calc_inversions(self, image, num_steps, w_start_pivot=None, seed:int=64):
         id_image = torch.squeeze((image.to(self.device) + 1) / 2) * 255
-        return project(self.G, id_image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot)
+        return project(self.G, id_image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=True)
 
     @abc.abstractmethod
     def train(self):
