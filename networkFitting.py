@@ -227,7 +227,7 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    w_pivots = calculLatents(
+    """w_pivots = calculLatents(
         G,
         dataloader,
         device,
@@ -250,9 +250,9 @@ def fitting(**kwargs):
         save_video=opts.save_video,
         outdir=opts.outdir,
         disable_gradient_reg_loss=opts.disable_gradient_reg_loss
-    )
-    #coache = MultiIDCoach(device, dataloader, opts.network_pkl, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.seed)
-    #coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps)
+    )"""
+    coache = MultiIDCoach(device, dataloader, opts.network_pkl, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.seed)
+    coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps)
     snapshot_data = {'G': G, 'G_ema': G}
     with open(f"{opts.outdir}/network.pkl", 'wb') as f:
         dill.dump(snapshot_data, f)

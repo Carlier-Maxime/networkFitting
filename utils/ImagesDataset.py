@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from torch.utils.data import Dataset
+from torchvision.transforms.functional import convert_image_dtype
 from PIL import Image
 import torch
 
@@ -26,8 +27,4 @@ class ImagesDataset(Dataset):
         if self.dezired_size<=0: self.dezired_size=s
         from_im = from_im.resize((self.dezired_size, self.dezired_size), Image.LANCZOS)
         from_im = np.array(from_im, dtype=np.float32)
-        
-        if self.source_transform:
-            from_im = self.source_transform(from_im)
-
         return fname, torch.tensor(from_im.transpose([2, 0, 1]))
