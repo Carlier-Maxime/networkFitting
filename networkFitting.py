@@ -197,12 +197,10 @@ def fitting(**kwargs):
 @click.option('--outdir', help='Where to save the output images', required=True, metavar='DIR', default='out')
 @click.option('--first-inv-steps', help='Number of inversion steps for first image', type=int, default=1000, show_default=True)
 @click.option('--inv-steps', help='Number of inversion steps for image (for first image use --first-inv-steps)', type=int, default=100, show_default=True)
-@click.option('--w-init', help='path to inital latent', type=str, default='', show_default=True)
 @click.option('--pti-steps', help='Number of pti steps', type=int, default=2500, show_default=True)
-@click.option('--ips', help='The number of image used in one second of video', type=int, default=10, show_default=True)
+@click.option('--ips', help='The number of image used in one second of input video', type=int, default=12, show_default=True)
 @click.option('--not-verbose', 'verbose', help='this flag disable the verbose mode', default=True, is_flag=True)
 @click.option('--device', help='torch device used', default='cuda', metavar='torch.device')
-@click.option('--disable-gradient-reg-loss', help='disable gradient reg loss (not recommanded (quality of fitting is degraded), use only if you have out of memory)', default=False, is_flag=True)
 def main(**kwargs):
     fitting(**kwargs)
 
