@@ -5,55 +5,23 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 sys.path.insert(1, 'stylegan-xl')
 import dnnlib, legacy
-from torch_utils.ops import filtered_lrelu, bias_act
+from torch_utils.ops import filtered_lrelu, bias_act, upfirdn2d
 from torch_utils import gen_utils
 from run_inversion import project, space_regularizer_loss
 from metrics import metric_utils
 
 from utils.ImagesDataset import ImagesDataset
 from coaches.multi_id_coach import MultiIDCoach
+from utils.models_utils import load_network
 
-def loadNetwork(network_pkl:str, device:torch.device, verbose:bool=True):
-    if verbose: print('Loading networks from "%s"...' % network_pkl)
-    device = torch.device(device)
-    with dnnlib.util.open_url(network_pkl) as fp:
-        G = legacy.load_network_pkl(fp)['G_ema'].to(device) # type: ignore
-    return G
-
-def getImagesFromVideo(filename:str, ips:int, device:torch.device, verbose:bool=True, dezired_size:int=-1):
-    video=cv2.VideoCapture(filename)
-    steps=(video.get(cv2.CAP_PROP_FRAME_COUNT)/video.get(cv2.CAP_PROP_FPS))*ips
-    frame_step = int(video.get(cv2.CAP_PROP_FPS)/ips)
-    if frame_step==0:
-        frame_step=1
-    images = []
-    read_counter=0
-    for i in trange(1,int(steps+1), desc='Loading images', unit='image', disable=(not verbose)):
-        target_pil = None
-        ret,cv2_im = video.read()
-        while (read_counter % frame_step != 0):
-            ret,cv2_im = video.read()
-            if not ret:
-                break
-            read_counter+=1
-        if not ret:
-            break
-        converted = cv2.cvtColor(cv2_im,cv2.COLOR_BGR2RGB)
-        target_pil = PIL.Image.fromarray(converted)
-        read_counter+=1
-        w, h = target_pil.size
-        s = min(w, h)
-        target_pil = target_pil.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
-        if dezired_size<=0: dezired_size=s
-        target_pil = target_pil.resize((dezired_size, dezired_size), PIL.Image.LANCZOS)
-        img_np = np.array(target_pil, dtype=np.uint8)
-        images.append(torch.tensor(img_np.transpose([2, 0, 1]), device=device))
-    return images
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 def initPlugins(verbose:bool=True):
     verbosity = 'brief' if verbose else 'none'
     bias_act._init(verbosity)
     filtered_lrelu._init(verbosity)
+    upfirdn2d._init(verbosity)
 
 def calculLatents(
     G,
@@ -199,24 +167,11 @@ def pti_multiple_targets(
 
     return G_pti
 
-def getImagesFromDir(directory:str, device:torch.device, verbose:bool=True, dezired_size:int=-1):
-    images = []
-    for entry in os.scandir(directory):
-        target_pil = PIL.Image.open(entry.path).convert('RGB')
-        w, h = target_pil.size
-        s = min(w, h)
-        target_pil = target_pil.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
-        if dezired_size<=0: dezired_size=s
-        target_pil = target_pil.resize((dezired_size, dezired_size), PIL.Image.LANCZOS)
-        img_np = np.array(target_pil, dtype=np.uint8)
-        images.append(torch.tensor(img_np.transpose([2, 0, 1]), device=device))
-    return images
-
 def fitting(**kwargs):
     start_time = perf_counter()
     opts = dnnlib.EasyDict(kwargs)
     device = torch.device(opts.device)
-    G = loadNetwork(opts.network_pkl, device, opts.verbose)
+    G = load_network(opts.network_path, device)
     dataset = ImagesDataset(
         opts.target_fname,
         None,
@@ -227,40 +182,13 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    """w_pivots = calculLatents(
-        G,
-        dataloader,
-        device,
-        opts.first_inv_steps,
-        opts.inv_steps,
-        opts.w_init,
-        opts.save_latent,
-        opts.save_video_latent,
-        opts.outdir,
-        opts.ips
-    )
-    G = pti_multiple_targets(
-        G,
-        w_pivots,
-        dataloader,
-        device,
-        opts.pti_steps,
-        verbose=opts.verbose,
-        seed=opts.seed,
-        save_video=opts.save_video,
-        outdir=opts.outdir,
-        disable_gradient_reg_loss=opts.disable_gradient_reg_loss
-    )"""
-    coache = MultiIDCoach(device, dataloader, opts.network_pkl, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.seed)
+    coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.seed, G=G)
     coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps)
-    snapshot_data = {'G': G, 'G_ema': G}
-    with open(f"{opts.outdir}/network.pkl", 'wb') as f:
-        dill.dump(snapshot_data, f)
     if opts.verbose : print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
     
 
 @click.command()
-@click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
+@click.option('--network', 'network_path', help='Network file (support pickle (.pkl) and torch (.pt))', required=True)
 @click.option('--target', 'target_fname', help='Target video file or directory content target images', required=True, metavar='FILE')
 @click.option('--seed', help='Random seed', type=int, default=64, show_default=True)
 @click.option('--save-video', help='Save an mp4 video of fitting progress', type=bool, default=False, show_default=True, is_flag=True)

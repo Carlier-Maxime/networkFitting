@@ -20,7 +20,7 @@ from . import conv2d_gradfix
 
 _plugin = None
 
-def _init():
+def _init(verbose:str='brief'):
     global _plugin
     if _plugin is None:
         _plugin = custom_ops.get_plugin(
@@ -29,6 +29,7 @@ def _init():
             headers=['upfirdn2d.h'],
             source_dir=os.path.dirname(__file__),
             extra_cuda_cflags=['--use_fast_math'],
+            verbose=verbose
         )
     return True
 

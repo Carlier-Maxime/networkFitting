@@ -16,7 +16,7 @@ from run_inversion import project
 from torch_utils import gen_utils
 
 class BaseCoach:
-    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64):
+    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None):
         self.device = device
         self.data_loader = data_loader
         self.network_path = network_path
@@ -27,14 +27,14 @@ class BaseCoach:
         self.w_pivots = {}
         self.image_counter = 0
         self.lpips_loss = LPIPS(net=hyperparameters.lpips_type).to(device).eval()
-        self.restart_training()
+        self.restart_training(G=G)
         self.w_seed = gen_utils.get_w_from_seed(self.G, 1, device, seed=seed)
         os.makedirs(self.outdir, exist_ok=True)
 
-    def restart_training(self):
+    def restart_training(self, G=None):
 
         # Initialize networks
-        self.G = load_network(self.network_path, self.device)
+        self.G = load_network(self.network_path, self.device) if G==None else G
         toogle_grad(self.G, True)
 
         self.original_G = load_network(self.network_path, self.device)

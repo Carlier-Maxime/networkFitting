@@ -7,8 +7,8 @@ from coaches.base_coach import BaseCoach
 
 class MultiIDCoach(BaseCoach):
 
-    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64):
-        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, seed)
+    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None):
+        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, seed, G)
 
     def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500):
         self.G.synthesis.train()
