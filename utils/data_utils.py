@@ -66,7 +66,8 @@ def make_dataset_by_video(video_path:str, ips:int, verbose:bool=True):
     return images
 
 def make_dataset(path, ips:int=60, verbose:bool=True):
-    assert os.path.isdir(path) or is_video_file(path), '%s is not a valid directory or video' % path
+    assert os.path.isdir(path) or is_video_file(path) or is_image_file(path), '%s is not a valid directory or video or image' % path
     if os.path.isdir(path): return make_dataset_by_dir(path)
     elif is_video_file(path): return make_dataset_by_video(path,ips,verbose)
+    elif is_image_file(path): return [[path.split('/')[-1].split('.')[0],path]]
     return []
