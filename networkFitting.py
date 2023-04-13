@@ -181,7 +181,7 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.seed, G=G, verbose=opts.verbose)
+    coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
     coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps)
     if opts.verbose : print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
     
@@ -193,6 +193,7 @@ def fitting(**kwargs):
 @click.option('--save-video', help='Save an mp4 video of fitting progress', type=bool, default=False, show_default=True, is_flag=True)
 @click.option('--save-latent', help='Save latent in file npz', type=bool, default=False, show_default=True, is_flag=True)
 @click.option('--save-video-latent', help='Save video for result latent optimization', type=bool, default=False, show_default=True, is_flag=True)
+@click.option('--save-img-result', help='Save image result of fitting target', type=bool, default=False, show_default=True, is_flag=True)
 @click.option('--outdir', help='Where to save the output images', required=True, metavar='DIR', default='out')
 @click.option('--first-inv-steps', help='Number of inversion steps for first image', type=int, default=1000, show_default=True)
 @click.option('--inv-steps', help='Number of inversion steps for image (for first image use --first-inv-steps)', type=int, default=100, show_default=True)

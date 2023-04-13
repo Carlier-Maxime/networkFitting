@@ -16,7 +16,7 @@ from run_inversion import project
 from torch_utils import gen_utils
 
 class BaseCoach:
-    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None, verbose:bool=True):
+    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True):
         self.device = device
         self.data_loader = data_loader
         self.network_path = network_path
@@ -24,6 +24,7 @@ class BaseCoach:
         self.save_latent = save_latent
         self.save_video_latent = save_video_latent
         self.save_video_pti = save_video_pti
+        self.save_img_result = save_img_result
         self.w_pivots = {}
         self.image_counter = 0
         self.lpips_loss = LPIPS(net=hyperparameters.lpips_type, verbose=verbose).to(device).eval()

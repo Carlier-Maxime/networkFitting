@@ -1,14 +1,14 @@
-import os
 import torch, imageio
 import numpy as np
 from tqdm import tqdm
-from configs import paths_config, hyperparameters, global_config
+from configs import hyperparameters, global_config
 from coaches.base_coach import BaseCoach
+from PIL import Image
 
 class MultiIDCoach(BaseCoach):
 
-    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, seed:int=64, G=None, verbose:bool=True):
-        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, seed, G, verbose)
+    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True):
+        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose)
 
     def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500):
         self.G.synthesis.train()
@@ -95,5 +95,18 @@ class MultiIDCoach(BaseCoach):
             for synth_image in target_images:
                 video.append_data(synth_image)
             video.close()
+            del seed_images
+            del target_images
+
+        if self.save_img_result:
+            for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='save image result', unit='image', disable=(not self.verbose)):
+                image_name, image = data
+                if self.image_counter >= hyperparameters.max_images_to_invert: break
+                real_images_batch = image.to(self.device)
+                synth_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
+                synth_images = (synth_images + 1) * (255/2)
+                synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+                Image.fromarray(synth_images_np, 'RGB').save(f'{self.outdir}/project_{image_name}.png')
+                self.image_counter += 1
 
         torch.save(self.G, f'{self.outdir}/network.pt')
