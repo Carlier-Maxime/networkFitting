@@ -1,10 +1,9 @@
-import click, torch, sys, cv2, PIL, numpy as np, os, copy, imageio, dill
+import click, torch, sys, numpy as np, os, copy, imageio
 from time import perf_counter
 from tqdm import tqdm,trange
 from torch.utils.data import DataLoader
-from torchvision.transforms import transforms
 sys.path.insert(1, 'stylegan-xl')
-import dnnlib, legacy
+import dnnlib
 from torch_utils.ops import filtered_lrelu, bias_act, upfirdn2d
 from torch_utils import gen_utils
 from run_inversion import project, space_regularizer_loss
