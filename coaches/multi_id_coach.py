@@ -99,6 +99,7 @@ class MultiIDCoach(BaseCoach):
             del target_images
 
         if self.save_img_result:
+            self.image_counter = 0
             for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='save image result', unit='image', disable=(not self.verbose)):
                 image_name, image = data
                 if self.image_counter >= hyperparameters.max_images_to_invert: break
