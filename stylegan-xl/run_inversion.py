@@ -17,10 +17,7 @@ import dnnlib
 import legacy
 from metrics import metric_utils
 import timm
-
-from training.diffaug import DiffAugment
-from pg_modules.blocks import Interpolate
-
+from utils.replace_color import pasteColor
 
 def get_morphed_w_code(new_w_code, fixed_w, regularizer_alpha=30):
     interpolation_direction = new_w_code - fixed_w
@@ -143,7 +140,7 @@ def pivotal_tuning(
 
 def project(
     G,
-    target: torch.Tensor, # [C,H,W] and dynamic range [0,255], W & H must match G output resolution
+    target: torch.Tensor, # [C,H,W] and dynamic range [-1,1], W & H must match G output resolution
     *,
     num_steps = 1000,
     w_avg_samples = 10000,
@@ -156,7 +153,7 @@ def project(
     w_start_pivot=None,
     seed:int=64
 ):
-    assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution), f"the shape not equals : {target.shape} and {(G.img_channels, G.img_resolution, G.img_resolution)}"
+    assert target.shape[1:] == (G.img_channels, G.img_resolution, G.img_resolution), f"the shape not equals : {target.shape[1:]} and {(G.img_channels, G.img_resolution, G.img_resolution)}"
 
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device) # type: ignore
 
@@ -166,7 +163,7 @@ def project(
             c_samples = None
         else:
             classifier = timm.create_model('deit_base_distilled_patch16_224', pretrained=True).eval().to(device)
-            cls_target = F.interpolate((target.to(device).to(torch.float32) / 127.5 - 1)[None], 224)
+            cls_target = F.interpolate((target.to(device))[None], 224)
             logits = classifier(cls_target).softmax(1)
             classes = torch.multinomial(logits, w_avg_samples, replacement=True).squeeze()
             print(f'Main class: {logits.argmax(1).item()}, confidence: {logits.max().item():.4f}')
@@ -188,17 +185,23 @@ def project(
     vgg16_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/vgg16.pkl'
     vgg16 = metric_utils.get_feature_detector(vgg16_url, device=device)
 
-    # Features for target image.
-    target_images = target.unsqueeze(0).to(device).to(torch.float32)
-    if target_images.shape[2] > 256:
-        target_images = F.interpolate(target_images, size=(256, 256), mode='area')
-    target_features = vgg16(target_images, resize_images=False, return_lpips=True)
-
     # initalize optimizer
     optimizer = torch.optim.Adam([w_opt], betas=(0.9, 0.999), lr=initial_learning_rate)
 
     # run optimization loop
     all_images = []
+    color = torch.tensor([-1.,1.,-1.]).to(device)
+    if 0: epsilon = torch.tensor([0.6,1.5,0.6]).to(device)
+    else: epsilon = 1.0
+    paste_color = True
+    save_img_step = True
+    target = target.to(device)
+    if not paste_color:
+        target = (target + 1) * (255/2)
+        if save_img_step: target_np = target.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+        if target.shape[2] > 256:
+            target = F.interpolate(target, size=(256, 256), mode='area')
+        target_features = vgg16(target, resize_images=False, return_lpips=True)
     for step in (pbar := trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))):
         # Learning rate schedule.
         t = step / num_steps
@@ -211,11 +214,21 @@ def project(
 
         # Synth images from opt_w.
         synth_images = G.synthesis(w_opt[0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
-
+        if paste_color:
+            target_edited = pasteColor(synth_images.clamp(-1,1), target.clone(), color, epsilon)
+            target_edited = (target_edited + 1) * (255/2)
+            if save_img_step: target_np = target_edited.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+            if target.shape[2] > 256:
+                target_edited = F.interpolate(target_edited, size=(256, 256), mode='area')
+            target_features = vgg16(target_edited, resize_images=False, return_lpips=True)
+        
         # track images
         synth_images = (synth_images + 1) * (255/2)
-        synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-        all_images.append(synth_images_np)
+        img_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+        all_images.append(img_np)
+
+        if save_img_step:
+            PIL.Image.fromarray(np.concatenate([img_np, target_np]), 'RGB').save(f'out/step_{step}.png')
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         if synth_images.shape[2] > 256:
