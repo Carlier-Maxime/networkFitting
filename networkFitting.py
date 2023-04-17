@@ -216,7 +216,7 @@ def fitting(**kwargs):
 @click.option('--paste-color', help='copies pixels that have the correct color from the generated image to the target image for the loss calculation', default=False, type=bool, is_flag=True)
 @click.option('--color', help='color used for paste color', default='[-1.,1.,-1.]')
 @click.option('--epsilon', help='a epsilon used for paste color', default=1.0)
-@click.option('--save_img_step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
+@click.option('--save-img-step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
 @click.option('--coache', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
 def main(**kwargs):
     fitting(**kwargs)
