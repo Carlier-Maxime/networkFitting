@@ -6,24 +6,28 @@ from torchvision.transforms import transforms
 def replaceColor(imgs,imgs_new_color,color,epsilon):
     assert imgs.shape == imgs_new_color.shape, f'Shape {imgs.shape} not equal {imgs_new_color.shape}'
     assert color.shape == torch.Size([3])
-    imgs = imgs.permute(0,2,3,1)
-    cond = (imgs>=(color-epsilon)) & (imgs<=(color+epsilon))
-    cond = cond[:,:,:,0] & cond[:,:,:,1] & cond[:,:,:,2]
-    imgs[cond]=imgs_new_color.permute(0,2,3,1)[cond]
-    imgs = imgs.permute(0,3,1,2)
+    cond = getMask(imgs, color, epsilon)
+    imgs[cond]=imgs_new_color[cond]
     return imgs
 
 def pasteColor(imgs_color, imgs, color, epsilon):
     assert imgs_color.shape == imgs.shape, f'Shape {imgs_color.shape} not equal {imgs.shape}'
     assert color.shape == torch.Size([3])
-    imgs_color = imgs_color.permute(0,2,3,1)
-    cond = (imgs_color>=(color-epsilon)) & (imgs_color<=(color+epsilon))
-    cond = cond[:,:,:,0] & cond[:,:,:,1] & cond[:,:,:,2]
-    imgs = imgs.permute(0,2,3,1)
+    cond = getMask(imgs_color, color, epsilon)
     imgs[cond]=imgs_color[cond]
-    imgs = imgs.permute(0,3,1,2)
-    imgs_color = imgs_color.permute(0,3,1,2)
     return imgs
+
+def maskColor(imgs, color, epsilon):
+    mask = ~getMask(imgs, color, epsilon)
+    return imgs * mask
+
+def getMask(imgs, color, epsilon):
+    imgs = imgs.permute(0,2,3,1)
+    cond = (imgs>=(color-epsilon)) & (imgs<=(color+epsilon))
+    cond[:,:,:,0] = cond[:,:,:,0] & cond[:,:,:,1] & cond[:,:,:,2]
+    cond[:,:,:,1] = cond[:,:,:,0]
+    cond[:,:,:,2] = cond[:,:,:,0]
+    return cond.permute(0,3,1,2)
 
 def loadImg(path):
     img = Image.open(path).convert('RGB')
@@ -49,7 +53,7 @@ def main(img1_path, img2_path, device_name, epsilon, color, outdir):
         epsilon=epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i]=float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
-    imgR = pasteColor(img1, img2, color, epsilon)
+    imgR = replaceColor(img1, img2, color, epsilon)
     imgR = (imgR + 1) * (255/2)
     imgR = imgR.permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{outdir}/replaced.png')
