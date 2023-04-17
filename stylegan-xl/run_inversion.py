@@ -193,8 +193,8 @@ def project(
     color = torch.tensor([-1.,1.,-1.]).to(device)
     if 0: epsilon = torch.tensor([0.6,1.5,0.6]).to(device)
     else: epsilon = 1.0
-    paste_color = True
-    save_img_step = True
+    paste_color = False
+    save_img_step = False
     target = target.to(device)
     if not paste_color:
         target = (target + 1) * (255/2)

@@ -63,7 +63,7 @@ class MultiIDCoach(BaseCoach):
                 target_images.append(synth_images_np)
                 del synth_images
 
-            for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='PTI', unit='image', disable=(not self.verbose)):
+            for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='PTI', unit='image', disable=(not self.verbose) or len(images)<10):
                 image_name, image = data
                 if self.image_counter >= hyperparameters.max_images_to_invert:
                     break
