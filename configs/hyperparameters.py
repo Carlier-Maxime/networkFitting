@@ -17,7 +17,6 @@ pt_lpips_lambda = 1
 
 ## Steps
 LPIPS_value_threshold = 0.001
-max_images_to_invert = 30
 
 ## Optimization
 pti_learning_rate = 3e-4

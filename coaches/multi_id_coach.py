@@ -10,7 +10,7 @@ class MultiIDCoach(BaseCoach):
     def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True):
         super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose)
 
-    def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500):
+    def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500, max_images:int=-1):
         self.G.synthesis.train()
         self.G.mapping.train()
 
@@ -20,9 +20,10 @@ class MultiIDCoach(BaseCoach):
         w_imgs = []
         wrimgs = []
 
-        for fname, image in tqdm(self.data_loader, desc='calcul latents', unit='image', disable=(not self.verbose)):
-            if self.image_counter >= hyperparameters.max_images_to_invert:
-                break
+        if max_images==-1 or max_images>len(self.data_loader.dataset): max_images = len(self.data_loader.dataset)
+
+        for fname, image in tqdm(self.data_loader, desc='calcul latents', unit='image', disable=(not self.verbose), total=max_images):
+            if self.image_counter >= max_images: break
             image_name = fname[0]
             if hyperparameters.use_last_w_pivots:
                 w_pivot = self.load_inversions(image_name)
@@ -65,13 +66,11 @@ class MultiIDCoach(BaseCoach):
 
             for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='PTI', unit='image', disable=(not self.verbose) or len(images)<10):
                 image_name, image = data
-                if self.image_counter >= hyperparameters.max_images_to_invert:
-                    break
+                if self.image_counter >= max_images: break
 
                 real_images_batch = image.to(self.device)
                 synth_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
-                loss, l2_loss_val, loss_lpips = self.calc_loss(synth_images, real_images_batch, image_name,
-                                      self.G, use_ball_holder, w_pivot)
+                loss, l2_loss_val, loss_lpips = self.calc_loss(synth_images, real_images_batch, image_name, self.G, use_ball_holder, w_pivot)
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -102,7 +101,7 @@ class MultiIDCoach(BaseCoach):
             self.image_counter = 0
             for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='save image result', unit='image', disable=(not self.verbose)):
                 image_name, image = data
-                if self.image_counter >= hyperparameters.max_images_to_invert: break
+                if self.image_counter >= max_images: break
                 real_images_batch = image.to(self.device)
                 synth_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
                 synth_images = (synth_images + 1) * (255/2)

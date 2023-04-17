@@ -182,7 +182,7 @@ def fitting(**kwargs):
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
     coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
-    coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps)
+    coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps, opts.max_images)
     if opts.verbose : print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
     
 
@@ -201,6 +201,7 @@ def fitting(**kwargs):
 @click.option('--ips', help='The number of image used in one second of input video', type=int, default=12, show_default=True)
 @click.option('--not-verbose', 'verbose', help='this flag disable the verbose mode', default=True, is_flag=True)
 @click.option('--device', help='torch device used', default='cuda', metavar='torch.device')
+@click.option('--max-images', help='max images used for fitting network', default=-1, type=int)
 def main(**kwargs):
     fitting(**kwargs)
 
