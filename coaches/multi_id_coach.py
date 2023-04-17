@@ -32,20 +32,14 @@ class MultiIDCoach(BaseCoach):
                 if self.save_video_latent:
                     w_imgs += imgs
                     wrimgs.append(imgs[-1])
+            if self.save_latent: torch.save(w_pivot, f'{self.outdir}/{image_name}.pt')
             w_pivots.append(w_pivot)
             images.append((image_name, image))
             self.image_counter += 1
         if self.save_video_latent:
-            if self.verbose: print("Saving optimization latent video..")
-            video = imageio.get_writer(f'{self.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
-            for synth_image in w_imgs:
-                video.append_data(np.array(synth_image))
-            video.close()
-            video = imageio.get_writer(f'{self.outdir}/resultLatent.mp4', mode='I', fps=10, codec='libx264', bitrate='16M')
-            for synth_image in wrimgs:
-                video.append_data(np.array(synth_image))
-            video.close()
-
+            self.save_imgs_to_video(w_imgs, "optiLatent.mp4", "Saving optimisation latent video..", fps=60)
+            self.save_imgs_to_video(wrimgs, "resultLatent.mp4", "Saving result latent video..", fps=10)
+        
         seed_images = []
         target_images = []
         step_loss = []
@@ -85,15 +79,8 @@ class MultiIDCoach(BaseCoach):
             pbar.set_postfix_str(f'loss: {np.mean(step_loss):<5.2f}')
 
         if self.save_video_pti:
-            if self.verbose: print (f'Saving network fitting progress video "{self.outdir}/fitting_seed.mp4" and "{self.outdir}/fitting_target.mp4"')
-            video = imageio.get_writer(f'{self.outdir}/fitting_seed.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
-            for synth_image in seed_images:
-                video.append_data(synth_image)
-            video.close()
-            video = imageio.get_writer(f'{self.outdir}/fitting_target.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
-            for synth_image in target_images:
-                video.append_data(synth_image)
-            video.close()
+            self.save_imgs_to_video(seed_images, "fitting_seed.mp4", "Saving network fitting video (seed view)..", fps=60)
+            self.save_imgs_to_video(target_images, "fitting_target.mp4", "Saving network fitting video (target view)..", fps=60)
             del seed_images
             del target_images
 

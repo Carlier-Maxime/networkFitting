@@ -11,6 +11,7 @@ from metrics import metric_utils
 
 from utils.ImagesDataset import ImagesDataset
 from coaches.multi_id_coach import MultiIDCoach
+from coaches.single_id_coach import SingleIDCoach
 from utils.models_utils import load_network
 
 import warnings
@@ -181,7 +182,9 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
+    if opts.coache == "multi": coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
+    elif opts.coache == "single": coache = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
+    else: raise TypeError("a type of coache is incorrect")
     color = opts.color[1:-1].split(',')
     for i in range(len(color)): color[i]=float(color[i])
     color = torch.tensor(color).to(device)
@@ -214,6 +217,7 @@ def fitting(**kwargs):
 @click.option('--color', help='color used for paste color', default='[-1.,1.,-1.]')
 @click.option('--epsilon', help='a epsilon used for paste color', default=1.0)
 @click.option('--save_img_step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
+@click.option('--coache', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
 def main(**kwargs):
     fitting(**kwargs)
 

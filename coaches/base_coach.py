@@ -14,6 +14,8 @@ import sys
 sys.path.insert(1, 'stylegan-xl')
 from run_inversion import project
 from torch_utils import gen_utils
+import imageio
+import numpy as np
 
 class BaseCoach:
     def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True):
@@ -88,3 +90,9 @@ class BaseCoach:
     def forward(self, w):
         generated_images = self.G.synthesis(w, noise_mode='const', force_fp32=True)
         return generated_images
+    
+    def save_imgs_to_video(self, imgs, outfile:str, msg:str="", fps:int=60):
+        if self.verbose: print(msg)
+        video = imageio.get_writer(f'{self.outdir}/{outfile}', mode='I', fps=fps, codec='libx264', bitrate='16M')
+        for synth_image in imgs: video.append_data(np.array(synth_image))
+        video.close()
