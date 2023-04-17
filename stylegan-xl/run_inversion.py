@@ -151,7 +151,11 @@ def project(
     device: torch.device,
     noise_mode="const",
     w_start_pivot=None,
-    seed:int=64
+    seed:int=64,
+    save_img_step:bool=False,
+    paste_color:bool=False,
+    color:torch.Tensor=torch.tensor([-1.,1.,-1.]),
+    epsilon=1.0
 ):
     assert target.shape[1:] == (G.img_channels, G.img_resolution, G.img_resolution), f"the shape not equals : {target.shape[1:]} and {(G.img_channels, G.img_resolution, G.img_resolution)}"
 
@@ -190,11 +194,7 @@ def project(
 
     # run optimization loop
     all_images = []
-    color = torch.tensor([-1.,1.,-1.]).to(device)
-    if 0: epsilon = torch.tensor([0.6,1.5,0.6]).to(device)
-    else: epsilon = 1.0
-    paste_color = False
-    save_img_step = False
+    color = color.to(device)
     target = target.to(device)
     if not paste_color:
         target = (target + 1) * (255/2)

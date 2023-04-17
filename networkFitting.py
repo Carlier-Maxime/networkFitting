@@ -182,7 +182,15 @@ def fitting(**kwargs):
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
     coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
-    coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps, opts.max_images)
+    color = opts.color[1:-1].split(',')
+    for i in range(len(color)): color[i]=float(color[i])
+    color = torch.tensor(color).to(device)
+    try: epsilon=float(opts.epsilon)
+    except:
+        epsilon=opts.epsilon[1:-1].split(',')
+        for i in range(len(epsilon)): epsilon[i]=float(epsilon[i])
+        epsilon = torch.tensor(epsilon).to(device)
+    coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps, opts.max_images, opts.paste_color, color, epsilon, opts.save_img_step)
     if opts.verbose : print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
     
 
@@ -202,6 +210,10 @@ def fitting(**kwargs):
 @click.option('--not-verbose', 'verbose', help='this flag disable the verbose mode', default=True, is_flag=True)
 @click.option('--device', help='torch device used', default='cuda', metavar='torch.device')
 @click.option('--max-images', help='max images used for fitting network', default=-1, type=int)
+@click.option('--paste-color', help='copies pixels that have the correct color from the generated image to the target image for the loss calculation', default=False, type=bool, is_flag=True)
+@click.option('--color', help='color used for paste color', default='[-1.,1.,-1.]')
+@click.option('--epsilon', help='a epsilon used for paste color', default=1.0)
+@click.option('--save_img_step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
 def main(**kwargs):
     fitting(**kwargs)
 

@@ -10,7 +10,7 @@ class MultiIDCoach(BaseCoach):
     def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True):
         super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose)
 
-    def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500, max_images:int=-1):
+    def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500, max_images:int=-1, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False):
         self.G.synthesis.train()
         self.G.mapping.train()
 
@@ -28,7 +28,7 @@ class MultiIDCoach(BaseCoach):
             if hyperparameters.use_last_w_pivots:
                 w_pivot = self.load_inversions(image_name)
             elif not hyperparameters.use_last_w_pivots or w_pivot is None:
-                imgs, w_pivot = self.calc_inversions(image, (inv_steps if len(w_pivots)>0 else first_inv_steps), w_start_pivot=(w_pivots[-1] if len(w_pivots)>0 else None), seed=self.seed)
+                imgs, w_pivot = self.calc_inversions(image, (inv_steps if len(w_pivots)>0 else first_inv_steps), w_start_pivot=(w_pivots[-1] if len(w_pivots)>0 else None), seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step)
                 if self.save_video_latent:
                     w_imgs += imgs
                     wrimgs.append(imgs[-1])

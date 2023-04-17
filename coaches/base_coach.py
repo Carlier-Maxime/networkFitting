@@ -56,8 +56,8 @@ class BaseCoach:
         self.w_pivots[image_name] = w
         return w
 
-    def calc_inversions(self, image, num_steps, w_start_pivot=None, seed:int=64):
-        return project(self.G, image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose)
+    def calc_inversions(self, image, num_steps, w_start_pivot=None, seed:int=64, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False):
+        return project(self.G, image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step)
 
     @abc.abstractmethod
     def train(self):
