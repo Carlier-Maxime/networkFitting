@@ -214,8 +214,8 @@ def fitting(**kwargs):
 @click.option('--device', help='torch device used', default='cuda', metavar='torch.device')
 @click.option('--max-images', help='max images used for fitting network', default=-1, type=int)
 @click.option('--paste-color', help='copies pixels that have the correct color from the generated image to the target image for the loss calculation', default=False, type=bool, is_flag=True)
-@click.option('--color', help='color used for paste color', default='[-1.,1.,-1.]')
-@click.option('--epsilon', help='a epsilon used for paste color', default='1.0')
+@click.option('--color', help='color used for paste color', default='[0,255,0]')
+@click.option('--epsilon', help='a epsilon used for paste color', default='[150,100,150]')
 @click.option('--save-img-step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
 @click.option('--coache', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
 def main(**kwargs):
