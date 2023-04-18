@@ -196,11 +196,11 @@ def project(
     all_images = []
     color = color.to(device)
     target = target.to(device)
-    if not paste_color:
-        target = (target + 1) * (255/2)
-        if save_img_step: target_np = target.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-        if target.shape[2] > 256:
+    target = (target + 1) * (255/2)
+    if target.shape[2] > 256:
             target = F.interpolate(target, size=(256, 256), mode='area')
+    if not paste_color:
+        if save_img_step: target_np = target.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
         target_features = vgg16(target, resize_images=False, return_lpips=True)
     for step in (pbar := trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))):
         # Learning rate schedule.
@@ -214,25 +214,19 @@ def project(
 
         # Synth images from opt_w.
         synth_images = G.synthesis(w_opt[0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
+        synth_images = (synth_images + 1) * (255/2)
+        if synth_images.shape[2] > 256:
+            synth_images = F.interpolate(synth_images, size=(256, 256), mode='area')
+
         if paste_color:
-            target_edited = pasteColor(synth_images.clamp(-1,1), target.clone(), color, epsilon)
-            target_edited = (target_edited + 1) * (255/2)
+            target_edited = pasteColor(synth_images.clone().clamp(0,255), target.clone(), color, epsilon)
             if save_img_step: target_np = target_edited.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-            if target.shape[2] > 256:
-                target_edited = F.interpolate(target_edited, size=(256, 256), mode='area')
             target_features = vgg16(target_edited, resize_images=False, return_lpips=True)
         
-        # track images
-        synth_images = (synth_images + 1) * (255/2)
         img_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
         all_images.append(img_np)
 
-        if save_img_step:
-            PIL.Image.fromarray(np.concatenate([img_np, target_np]), 'RGB').save(f'out/step_{step}.png')
-
-        # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
-        if synth_images.shape[2] > 256:
-            synth_images = F.interpolate(synth_images, size=(256, 256), mode='area')
+        if save_img_step: PIL.Image.fromarray(np.concatenate([img_np, target_np]), 'RGB').save(f'out/step_{step}.png')
 
         # Features for synth images.
         synth_features = vgg16(synth_images, resize_images=False, return_lpips=True)
