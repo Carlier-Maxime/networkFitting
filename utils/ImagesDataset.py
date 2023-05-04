@@ -10,10 +10,11 @@ from utils.data_utils import make_dataset
 
 class ImagesDataset(Dataset):
 
-    def __init__(self, source_root, source_transform=None, dezired_size:int=-1, video_ips:int=60, verbose_make:bool=True):
+    def __init__(self, source_root, source_transform=None, dezired_size:int=-1, video_ips:int=60, verbose_make:bool=True, img_mode:str='auto'):
         self.source_paths = sorted(make_dataset(source_root, video_ips, verbose_make))
         self.source_transform = source_transform
         self.dezired_size=dezired_size
+        self.img_mode=img_mode
 
     def __len__(self):
         return len(self.source_paths)
@@ -21,6 +22,7 @@ class ImagesDataset(Dataset):
     def __getitem__(self, index):
         fname, from_path = self.source_paths[index]
         from_im = Image.open(from_path)
+        if self.img_mode!='auto': from_im =from_im.convert(self.img_mode)
         w, h = from_im.size
         s = min(w, h)
         from_im = from_im.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))

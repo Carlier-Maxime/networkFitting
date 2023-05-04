@@ -177,7 +177,8 @@ def fitting(**kwargs):
         None,
         G.img_resolution,
         opts.ips,
-        opts.verbose
+        opts.verbose,
+        img_mode=opts.img_mode
     )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
@@ -218,6 +219,7 @@ def fitting(**kwargs):
 @click.option('--epsilon', help='a epsilon used for paste color', default='[150,100,150]')
 @click.option('--save-img-step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
 @click.option('--coache', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
+@click.option('--img-mode', type=click.Choice(["auto","RGB","RGBA"]), default='auto', help="choice mode for loading image")
 def main(**kwargs):
     fitting(**kwargs)
 
