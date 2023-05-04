@@ -74,10 +74,11 @@ class BaseCoach:
         loss = 0.0
 
         if hyperparameters.pt_l2_lambda > 0:
-            l2_loss_val = l2_loss.l2_loss(generated_images, real_images)
+            l2_loss_val = l2_loss.l2_loss(real_images, generated_images)
             loss += l2_loss_val * hyperparameters.pt_l2_lambda
         if hyperparameters.pt_lpips_lambda > 0:
-            loss_lpips = self.lpips_loss(generated_images, real_images)
+            loss_lpips = self.lpips_loss(generated_images[:,:3], real_images[:,:3])
+            if real_images.shape[1]==4: loss_lpips += self.lpips_loss(generated_images[:,3:4].repeat(1,3,1,1), real_images[:,3:4].repeat(1,3,1,1))
             loss_lpips = torch.squeeze(loss_lpips)
             loss += loss_lpips * hyperparameters.pt_lpips_lambda
 

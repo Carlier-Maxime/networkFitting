@@ -20,10 +20,12 @@ class ImagesDataset(Dataset):
 
     def __getitem__(self, index):
         fname, from_path = self.source_paths[index]
-        from_im = Image.open(from_path).convert('RGB')
+        from_im = Image.open(from_path)
         w, h = from_im.size
         s = min(w, h)
         from_im = from_im.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
         if self.dezired_size<=0: self.dezired_size=s
         from_im = from_im.resize((self.dezired_size, self.dezired_size), Image.LANCZOS)
-        return fname, transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])(from_im)
+        tab_normalize = [0.5, 0.5, 0.5]
+        if from_im.mode=="RGBA": tab_normalize += [0.5]
+        return fname, transforms.Compose([transforms.ToTensor(), transforms.Normalize(tab_normalize, tab_normalize)])(from_im)

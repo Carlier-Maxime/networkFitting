@@ -60,12 +60,14 @@ class SingleIDCoach(BaseCoach):
                 pbar.set_postfix_str(f'loss: {float(loss):<5.2f}')
             self.image_counter += 1
             if self.save_img_result:
-                generated_images = (generated_images + 1) * (255/2)
-                generated_images_np = generated_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-                Image.fromarray(generated_images_np, 'RGB').save(f'{self.outdir}/project_{image_name}.png')
+                if generated_images is None: generated_images_np = wrimgs[-1]
+                else:
+                    generated_images = (generated_images + 1) * (255/2)
+                    generated_images_np = generated_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+                Image.fromarray(generated_images_np, 'RGBA' if generated_images_np.shape[2]==4 else 'RGB').save(f'{self.outdir}/project_{image_name}.png')
             del generated_images
 
-        torch.save(self.G, f'{self.outdir}/network.pt')
+        if pti_steps>0: torch.save(self.G, f'{self.outdir}/network.pt')
 
         if self.save_video_latent:
             self.save_imgs_to_video(w_imgs, "optiLatent.mp4", "Saving optimisation latent video..", fps=60)

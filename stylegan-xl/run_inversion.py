@@ -157,8 +157,7 @@ def project(
     color:torch.Tensor=torch.tensor([-1.,1.,-1.]),
     epsilon=1.0
 ):
-    assert target.shape[1:] == (G.img_channels, G.img_resolution, G.img_resolution), f"the shape not equals : {target.shape[1:]} and {(G.img_channels, G.img_resolution, G.img_resolution)}"
-
+    assert G.img_channels >= target.shape[1]
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device) # type: ignore
 
     if w_start_pivot==None:
@@ -201,7 +200,8 @@ def project(
             target = F.interpolate(target, size=(256, 256), mode='area')
     if not paste_color:
         if save_img_step: target_np = target.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-        target_features = vgg16(target, resize_images=False, return_lpips=True)
+        target_features = vgg16(target[:,:3], resize_images=False, return_lpips=True)
+        if target.shape[1] == 4: target_features += vgg16(target[:,3:4].repeat(1,3,1,1), resize_images=False, return_lpips=True)
     for step in (pbar := trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))):
         # Learning rate schedule.
         t = step / num_steps
@@ -229,7 +229,8 @@ def project(
         if save_img_step: PIL.Image.fromarray(np.concatenate([img_np, target_np]), 'RGB').save(f'out/step_{step}.png')
 
         # Features for synth images.
-        synth_features = vgg16(synth_images, resize_images=False, return_lpips=True)
+        synth_features = vgg16(synth_images[:,:3], resize_images=False, return_lpips=True)
+        if target.shape[1] == 4: synth_features += vgg16(synth_images[:,3:4].repeat(1,3,1,1), resize_images=False, return_lpips=True)
         lpips_loss = (target_features - synth_features).square().sum()
 
         # Step
