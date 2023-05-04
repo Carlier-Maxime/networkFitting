@@ -1,9 +1,6 @@
-import os
-import numpy as np
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 from PIL import Image
-import torch
 
 from utils.data_utils import make_dataset
 
