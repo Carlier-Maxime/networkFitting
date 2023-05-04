@@ -155,7 +155,8 @@ def project(
     save_img_step:bool=False,
     paste_color:bool=False,
     color:torch.Tensor=torch.tensor([-1.,1.,-1.]),
-    epsilon=1.0
+    epsilon=1.0,
+    pbar=None
 ):
     assert G.img_channels >= target.shape[1]
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device) # type: ignore
@@ -202,7 +203,11 @@ def project(
         if save_img_step: target_np = target.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
         target_features = vgg16(target[:,:3], resize_images=False, return_lpips=True)
         if target.shape[1] == 4: target_features += vgg16(target[:,3:4].repeat(1,3,1,1), resize_images=False, return_lpips=True)
-    for step in (pbar := trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))):
+    close_pbar = False
+    if pbar is None: 
+        pbar=trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))
+        close_pbar=True
+    for step in range(num_steps):
         # Learning rate schedule.
         t = step / num_steps
         lr_ramp = min(1.0, (1.0 - t) / lr_rampdown_length)
@@ -238,8 +243,9 @@ def project(
         loss = lpips_loss
         loss.backward()
         optimizer.step()
+        pbar.update()
         if verbose: pbar.set_postfix_str(f'loss: {float(loss):<5.2f}')
-
+    if close_pbar: pbar.close()
     return all_images, (w_opt.detach()[0] if w_start_pivot==None else w_opt)
 
 

@@ -18,13 +18,16 @@ class SingleIDCoach(BaseCoach):
         seed_images=[]
         target_images=[]
         if max_images==-1 or max_images>len(self.data_loader.dataset): max_images = len(self.data_loader.dataset)
-        for fname, image in tqdm(self.data_loader, desc='fitting', unit='image', total=max_images):
+        pbar1 = tqdm(total=max_images, desc='fitting', unit='image', disable=(not self.verbose))
+        pbar2 = tqdm(total=first_inv_steps, desc='optimization Latent', unit='step', disable=(not self.verbose))
+        pbar3 = tqdm(total=pti_steps, desc='pivotal tuning', unit='step', disable=(not self.verbose))
+        for fname, image in self.data_loader:
             image_name = fname[0]
             if self.image_counter >= max_images: break
             if hyperparameters.use_last_w_pivots:
                 w_pivot = self.load_inversions(image_name)
             elif not hyperparameters.use_last_w_pivots or w_pivot is None:
-                imgs, w_pivot = self.calc_inversions(image, (inv_steps if w_pivot!=None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step)
+                imgs, w_pivot = self.calc_inversions(image, (inv_steps if w_pivot!=None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar2)
                 if self.save_video_latent:
                     w_imgs += imgs
                     wrimgs.append(imgs[-1])
@@ -34,7 +37,7 @@ class SingleIDCoach(BaseCoach):
             real_images_batch = image.to(self.device)
 
             generated_images = None
-            for i in (pbar := tqdm(range(pti_steps), desc='pivotal tuning', unit='step')):
+            for _ in range(pti_steps):
                 generated_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
                 if self.save_video_pti:
                     synth_images = self.forward(self.w_seed)
@@ -57,7 +60,8 @@ class SingleIDCoach(BaseCoach):
                 use_ball_holder = global_config.training_step % hyperparameters.locality_regularization_interval == 0
 
                 global_config.training_step += 1
-                pbar.set_postfix_str(f'loss: {float(loss):<5.2f}')
+                pbar3.update()
+                pbar3.set_postfix_str(f'loss: {float(loss):<5.2f}')
             self.image_counter += 1
             if self.save_img_result:
                 if generated_images is None: generated_images_np = wrimgs[-1]
@@ -66,6 +70,16 @@ class SingleIDCoach(BaseCoach):
                     generated_images_np = generated_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
                 Image.fromarray(generated_images_np, 'RGBA' if generated_images_np.shape[2]==4 else 'RGB').save(f'{self.outdir}/project_{image_name}.png')
             del generated_images
+            if pbar1.n==0:
+                pbar2.total = inv_steps
+                pbar2.n = inv_steps
+            elif pbar1.n==max_images:
+                pbar3.reset()
+                pbar2.reset()
+            pbar1.update()
+        pbar1.close()
+        pbar2.close()
+        pbar3.close()
 
         if pti_steps>0: torch.save(self.G, f'{self.outdir}/network.pt')
 
