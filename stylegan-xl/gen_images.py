@@ -94,9 +94,11 @@ def generate_images(
 ):
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
-    with dnnlib.util.open_url(network_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema']
-        G = G.eval().requires_grad_(False).to(device)
+    if network_pkl.endswith('.pkl'):
+        with dnnlib.util.open_url(network_pkl) as f:
+            G = legacy.load_network_pkl(f)['G_ema']
+    else: G = torch.load(network_pkl)
+    G = G.eval().requires_grad_(False).to(device)
 
     os.makedirs(outdir, exist_ok=True)
 
