@@ -59,6 +59,8 @@ class ProjectedGANLoss(Loss):
         cls = timm.create_model(cls_model, pretrained=True).eval()
         self.classifier = nn.Sequential(Interpolate(224), cls).to(device)
         normstats = get_backbone_normstats(cls_model)
+        normstats['mean'] = normstats['mean'][:G.img_channels]
+        normstats['std'] = normstats['std'][:G.img_channels]
         self.norm = Normalize(normstats['mean'], normstats['std'])
         self.cls_weight = cls_weight
         self.cls_guidance_loss = torch.nn.CrossEntropyLoss()

@@ -83,11 +83,13 @@ def save_image_grid(img, fname, drange, grid_size):
     img = img.transpose(0, 3, 1, 4, 2)
     img = img.reshape([gh * H, gw * W, C])
 
-    assert C in [1, 3]
+    assert C in [1, 3, 4]
     if C == 1:
         PIL.Image.fromarray(img[:, :, 0], 'L').save(fname)
-    if C == 3:
+    elif C == 3:
         PIL.Image.fromarray(img, 'RGB').save(fname)
+    elif C == 4:
+        PIL.Image.fromarray(img, 'RGBA').save(fname)
 
 #----------------------------------------------------------------------------
 

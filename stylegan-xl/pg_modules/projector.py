@@ -9,22 +9,21 @@ from pg_modules.blocks import FeatureFusionBlock
 def get_backbone_normstats(backbone):
     if backbone in NORMALIZED_INCEPTION:
         return {
-            'mean': [0.5, 0.5, 0.5],
-            'std': [0.5, 0.5, 0.5],
+            'mean': [0.5, 0.5, 0.5, 0.5],
+            'std': [0.5, 0.5, 0.5, 0.5],
         }
 
     elif backbone in NORMALIZED_IMAGENET:
         return {
-            'mean': [0.485, 0.456, 0.406],
-            'std': [0.229, 0.224, 0.225],
+            'mean': [0.485, 0.456, 0.406, 0.435],
+            'std': [0.229, 0.224, 0.225, 0.226],
         }
 
     elif backbone in NORMALIZED_CLIP:
         return {
-            'mean': [0.48145466, 0.4578275, 0.40821073],
-            'std': [0.26862954, 0.26130258, 0.27577711],
+            'mean': [0.48145466, 0.4578275, 0.40821073, 0.4326241],
+            'std': [0.26862954, 0.26130258, 0.27577711, 0.2710581],
         }
-
     else:
         raise NotImplementedError
 
@@ -111,9 +110,16 @@ class F_RandomProj(nn.Module):
     def forward(self, x):
         # predict feature maps
         if self.backbone in VITS:
-            out0, out1, out2, out3 = forward_vit(self.pretrained, x)
+            out0, out1, out2, out3 = forward_vit(self.pretrained, x[:,:3])
+            if x.shape[1]==4:
+                tmp = forward_vit(self.pretrained, x[:,3:4].repeat(1,3,1,1))
+                out0 += tmp[0]
+                out1 += tmp[1]
+                out2 += tmp[2]
+                out3 += tmp[3]
         else:
-            out0 = self.pretrained.layer0(x)
+            out0 = self.pretrained.layer0(x[:,:3])
+            if x.shape[1]==4: out0 += self.pretrained.layer0(x[:,3:4].repeat(1,3,1,1))
             out1 = self.pretrained.layer1(out0)
             out2 = self.pretrained.layer2(out1)
             out3 = self.pretrained.layer3(out2)
