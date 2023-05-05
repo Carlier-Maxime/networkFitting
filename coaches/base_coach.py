@@ -1,19 +1,15 @@
 import abc
 import os
-import pickle
-from argparse import Namespace
 import os.path
 from criteria.localitly_regulizer import Space_Regulizer
 import torch
-from torchvision import transforms
 from lpips import LPIPS
-from configs import global_config, paths_config, hyperparameters
+from configs import hyperparameters
 from criteria import l2_loss
 from utils.models_utils import toogle_grad, load_network
 import sys
-sys.path.insert(1, 'stylegan-xl')
-from run_inversion import project
-from torch_utils import gen_utils
+from stylegan_xl.run_inversion import project
+from stylegan_xl.torch_utils import gen_utils
 import imageio
 import numpy as np
 
