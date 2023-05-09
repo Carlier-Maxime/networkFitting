@@ -268,15 +268,15 @@ class Renderer:
         for idx, seed in enumerate(all_seeds):
             rnd = np.random.RandomState(seed)
             all_zs[idx] = rnd.randn(G.z_dim)
-            cls = rnd.randint(G.c_dim)
             if G.c_dim > 0:
+                cls = rnd.randint(G.c_dim)
                 all_cs[idx, cls] = 1
 
         # Run mapping network.
-        w_avg = G.mapping.w_avg[cls]
+        if G.c_dim>0: w_avg = G.mapping.w_avg[cls]
         all_zs = self.to_device(torch.from_numpy(all_zs))
         all_cs = self.to_device(torch.from_numpy(all_cs))
-        all_ws = G.mapping(z=all_zs, c=all_cs, truncation_psi=trunc_psi, truncation_cutoff=trunc_cutoff) - w_avg
+        all_ws = G.mapping(z=all_zs, c=all_cs, truncation_psi=trunc_psi, truncation_cutoff=trunc_cutoff) - (w_avg if G.c_dim>0 else 0) 
         all_ws = dict(zip(all_seeds, all_ws))
 
         # Calculate final W.
@@ -284,7 +284,7 @@ class Renderer:
         stylemix_idx = [idx for idx in stylemix_idx if 0 <= idx < G.num_ws]
         if len(stylemix_idx) > 0:
             w[:, stylemix_idx] = all_ws[stylemix_seed][np.newaxis, stylemix_idx]
-        w += w_avg
+        if G.c_dim>0: w += w_avg
 
         # Run synthesis network.
         synthesis_kwargs = dnnlib.EasyDict(noise_mode=noise_mode, force_fp32=force_fp32)
