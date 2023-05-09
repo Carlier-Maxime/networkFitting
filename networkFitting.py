@@ -2,7 +2,9 @@ import click, torch, os
 from time import perf_counter
 from torch.utils.data import DataLoader
 from stylegan_xl import dnnlib
-from stylegan_xl.torch_utils.ops import filtered_lrelu, bias_act, upfirdn2d
+import sys
+sys.path.insert(1,'stylegan_xl')
+from torch_utils.ops import filtered_lrelu, bias_act, upfirdn2d
 
 from utils.ImagesDataset import ImagesDataset
 from coaches.multi_id_coach import MultiIDCoach
