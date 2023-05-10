@@ -220,6 +220,8 @@ def project(
         # Synth images from opt_w.
         synth_images = G.synthesis(w_opt[0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
         synth_images = (synth_images + 1) * (255/2)
+        img_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+        all_images.append(img_np)
         if synth_images.shape[2] > 256:
             synth_images = F.interpolate(synth_images, size=(256, 256), mode='area')
 
@@ -227,9 +229,6 @@ def project(
             target_edited = pasteColor(synth_images.clone().clamp(0,255), target.clone(), color, epsilon)
             if save_img_step: target_np = target_edited.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
             target_features = vgg16(target_edited, resize_images=False, return_lpips=True)
-        
-        img_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-        all_images.append(img_np)
 
         if save_img_step: PIL.Image.fromarray(np.concatenate([img_np, target_np]), 'RGB').save(f'out/step_{step}.png')
 

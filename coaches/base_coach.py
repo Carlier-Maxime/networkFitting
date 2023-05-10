@@ -89,7 +89,10 @@ class BaseCoach:
         return generated_images
     
     def save_imgs_to_video(self, imgs, outfile:str, msg:str="", fps:int=60):
-        if self.verbose: print(msg)
+        if self.verbose and msg!="": print(msg)
         video = imageio.get_writer(f'{self.outdir}/{outfile}', mode='I', fps=fps, codec='libx264', bitrate='16M')
-        for synth_image in imgs: video.append_data(np.array(synth_image))
+        self.video_append(video,imgs)
         video.close()
+    
+    def video_append(self, video, imgs):
+        for synth_image in imgs: video.append_data(np.array(synth_image))

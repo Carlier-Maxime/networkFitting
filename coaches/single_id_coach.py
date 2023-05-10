@@ -1,7 +1,7 @@
-import os
+import imageio
 import torch
 from tqdm import tqdm
-from configs import paths_config, hyperparameters, global_config
+from configs import hyperparameters, global_config
 from coaches.base_coach import BaseCoach
 from PIL import Image
 
@@ -13,15 +13,21 @@ class SingleIDCoach(BaseCoach):
     def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500, max_images:int=-1, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False):
         use_ball_holder = True
         w_pivot = None
-        w_imgs=[]
-        wrimgs=[]
-        seed_images=[]
-        target_images=[]
         if max_images==-1 or max_images>len(self.data_loader.dataset): max_images = len(self.data_loader.dataset)
         pbar1 = tqdm(total=max_images, desc='fitting', unit='image', disable=(not self.verbose))
         pbar2 = tqdm(total=first_inv_steps, desc='optimization Latent', unit='step', disable=(not self.verbose))
         pbar3 = tqdm(total=pti_steps, desc='pivotal tuning', unit='step', disable=(not self.verbose))
+        if self.save_video_latent:
+            videoOptiLatent = imageio.get_writer(f'{self.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+            videoResultLatent = imageio.get_writer(f'{self.outdir}/resultLatent.mp4', mode='I', fps=10, codec='libx264', bitrate='16M')
+        if self.save_video_pti:
+            videoFittingSeed = imageio.get_writer(f'{self.outdir}/fitting_seed.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+            videoFittingTarget = imageio.get_writer(f'{self.outdir}/fitting_target.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
         for fname, image in self.data_loader:
+            w_imgs=[]
+            wrimgs=[]
+            seed_images=[]
+            target_images=[]
             image_name = fname[0]
             if self.image_counter >= max_images: break
             if hyperparameters.use_last_w_pivots:
@@ -77,18 +83,22 @@ class SingleIDCoach(BaseCoach):
                 pbar3.reset()
                 pbar2.reset()
             pbar1.update()
+            if self.save_video_latent:
+                self.video_append(videoOptiLatent, w_imgs)
+                self.video_append(videoResultLatent, wrimgs)
+
+            if self.save_video_pti:
+                self.video_append(videoFittingSeed, seed_images)
+                self.video_append(videoFittingTarget, target_images)
         pbar1.close()
         pbar2.close()
         pbar3.close()
-
-        if pti_steps>0: torch.save(self.G, f'{self.outdir}/network.pt')
-
         if self.save_video_latent:
-            self.save_imgs_to_video(w_imgs, "optiLatent.mp4", "Saving optimisation latent video..", fps=60)
-            self.save_imgs_to_video(wrimgs, "resultLatent.mp4", "Saving result latent video..", fps=10)
+            videoOptiLatent.close()
+            videoResultLatent.close()
 
         if self.save_video_pti:
-            self.save_imgs_to_video(seed_images, "fitting_seed.mp4", "Saving network fitting video (seed view)..", fps=60)
-            self.save_imgs_to_video(target_images, "fitting_target.mp4", "Saving network fitting video (target view)..", fps=60)
-            del seed_images
-            del target_images
+            videoFittingSeed.close()
+            videoResultLatent.close()
+
+        if pti_steps>0: torch.save(self.G, f'{self.outdir}/network.pt')
