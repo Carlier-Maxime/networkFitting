@@ -36,8 +36,8 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    if opts.coache == "multi": coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
-    elif opts.coache == "single": coache = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose)
+    if opts.coache == "multi": coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
+    elif opts.coache == "single": coache = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
     else: raise TypeError("a type of coache is incorrect")
     color = opts.color[1:-1].split(',')
     for i in range(len(color)): color[i]=float(color[i])
@@ -73,6 +73,7 @@ def fitting(**kwargs):
 @click.option('--save-img-step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
 @click.option('--coache', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
 @click.option('--img-mode', type=click.Choice(["auto","RGB","RGBA"]), default='auto', help="choice mode for loading image")
+@click.option('--load-w-pivot', type=bool, default=False, help="enable load w_pivot by file in outdir", is_flag=True)
 def main(**kwargs):
     fitting(**kwargs)
 

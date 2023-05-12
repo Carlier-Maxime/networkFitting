@@ -7,8 +7,8 @@ from PIL import Image
 
 class SingleIDCoach(BaseCoach):
 
-    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True):
-        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose)
+    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True, load_w_pivot:bool=False):
+        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose, load_w_pivot)
 
     def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500, max_images:int=-1, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False):
         use_ball_holder = True
@@ -30,16 +30,13 @@ class SingleIDCoach(BaseCoach):
             target_images=[]
             image_name = fname[0]
             if self.image_counter >= max_images: break
-            if hyperparameters.use_last_w_pivots:
-                w_pivot = self.load_inversions(image_name)
-            elif not hyperparameters.use_last_w_pivots or w_pivot is None:
-                imgs, w_pivot = self.calc_inversions(image, (inv_steps if w_pivot!=None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar2)
-                if self.save_video_latent:
-                    w_imgs += imgs
-                    wrimgs.append(imgs[-1])
+            imgs, w_pivot = self.get_inversions(image_name, image, (inv_steps if w_pivot!=None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar2)
+            if self.save_video_latent:
+                w_imgs += imgs
+                wrimgs.append(imgs[-1])
 
             w_pivot = w_pivot.to(self.device)
-            if self.save_latent: torch.save(w_pivot, f'{self.outdir}/{image_name}.pt')
+            if self.save_latent: torch.save(w_pivot, f'{self.outdir}/latent_{image_name}.pt')
             real_images_batch = image.to(self.device)
 
             generated_images = None

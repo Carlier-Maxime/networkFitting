@@ -14,7 +14,7 @@ import imageio
 import numpy as np
 
 class BaseCoach:
-    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True):
+    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True, load_w_pivot:bool=False):
         self.device = device
         self.data_loader = data_loader
         self.network_path = network_path
@@ -30,6 +30,7 @@ class BaseCoach:
         self.seed = seed
         self.w_seed = gen_utils.get_w_from_seed(self.G, 1, device, seed=seed)
         self.verbose = verbose
+        self.load_w_pivot = load_w_pivot
         os.makedirs(self.outdir, exist_ok=True)
 
     def restart_training(self, G=None):
@@ -43,19 +44,17 @@ class BaseCoach:
         self.space_regulizer = Space_Regulizer(self.original_G, self.lpips_loss)
         self.optimizer = self.configure_optimizers()
 
-    def load_inversions(self, image_name):
-        if image_name in self.w_pivots:
-            return self.w_pivots[image_name]
-
-        w_potential_path = f'{self.outdir}/latent_{image_name}.pt'
-        if not os.path.isfile(w_potential_path):
-            return None
-        w = torch.load(w_potential_path).to(self.device)
+    def get_inversions(self, image_name, image, num_steps:int=1000, w_start_pivot=None, seed:int=64, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False, pbar=None):
+        if image_name in self.w_pivots: return self.w_pivots[image_name]
+        w = self.load_inversions(image_name) if self.load_w_pivot else None
+        if w is None: w = project(self.G, image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar)
         self.w_pivots[image_name] = w
         return w
 
-    def calc_inversions(self, image, num_steps, w_start_pivot=None, seed:int=64, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False, pbar=None):
-        return project(self.G, image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar)
+    def load_inversions(self, image_name):
+        w_path = f'{self.outdir}/latent_{image_name}.pt'
+        if not os.path.isfile(w_path): return None
+        return torch.load(w_path).to(self.device)
 
     @abc.abstractmethod
     def train(self):

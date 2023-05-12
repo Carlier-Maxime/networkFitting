@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from criteria import l2_loss
 from configs import hyperparameters
-from configs import global_config
 
 
 class Space_Regulizer:
@@ -23,11 +22,11 @@ class Space_Regulizer:
     def get_image_from_ws(self, w_codes, G):
         return torch.cat([G.synthesis(w_code, noise_mode='none', force_fp32=True) for w_code in w_codes])
 
-    def ball_holder_loss_lazy(self, new_G, num_of_sampled_latents, w_batch, use_wandb=False):
+    def ball_holder_loss_lazy(self, new_G, num_of_sampled_latents, w_batch):
         loss = 0.0
 
         z_samples = np.random.randn(num_of_sampled_latents, self.original_G.z_dim)
-        w_samples = self.original_G.mapping(torch.from_numpy(z_samples).to(global_config.device), None,
+        w_samples = self.original_G.mapping(torch.from_numpy(z_samples).to(new_G.device), None,
                                             truncation_psi=0.5)
         territory_indicator_ws = [self.get_morphed_w_code(w_code.unsqueeze(0), w_batch) for w_code in w_samples]
 
