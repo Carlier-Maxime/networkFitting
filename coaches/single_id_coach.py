@@ -1,7 +1,7 @@
 import imageio
 import torch
 from tqdm import tqdm
-from configs import hyperparameters, global_config
+from configs import hyperparameters
 from coaches.base_coach import BaseCoach
 from PIL import Image
 
@@ -43,7 +43,7 @@ class SingleIDCoach(BaseCoach):
             real_images_batch = image.to(self.device)
 
             generated_images = None
-            for _ in range(pti_steps):
+            for i in range(pti_steps):
                 generated_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
                 if self.save_video_pti:
                     synth_images = self.forward(self.w_seed)
@@ -63,9 +63,8 @@ class SingleIDCoach(BaseCoach):
 
                 loss.backward()
                 self.optimizer.step()
-                use_ball_holder = global_config.training_step % hyperparameters.locality_regularization_interval == 0
+                use_ball_holder = (i+1) % hyperparameters.locality_regularization_interval == 0
 
-                global_config.training_step += 1
                 pbar3.update()
                 pbar3.set_postfix_str(f'loss: {float(loss):<5.2f}')
             self.image_counter += 1

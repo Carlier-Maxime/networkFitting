@@ -1,7 +1,7 @@
 import torch, imageio
 import numpy as np
 from tqdm import tqdm
-from configs import hyperparameters, global_config
+from configs import hyperparameters
 from coaches.base_coach import BaseCoach
 from PIL import Image
 
@@ -58,6 +58,7 @@ class MultiIDCoach(BaseCoach):
                 target_images.append(synth_images_np)
                 del synth_images
 
+            training_step = 1
             for data, w_pivot in tqdm(zip(images, w_pivots), total=len(images), desc='PTI', unit='image', disable=(not self.verbose) or len(images)<10):
                 image_name, image = data
                 if self.image_counter >= max_images: break
@@ -70,9 +71,9 @@ class MultiIDCoach(BaseCoach):
                 loss.backward()
                 self.optimizer.step()
 
-                use_ball_holder = global_config.training_step % hyperparameters.locality_regularization_interval == 0
+                use_ball_holder = training_step % hyperparameters.locality_regularization_interval == 0
 
-                global_config.training_step += 1
+                training_step += 1
                 self.image_counter += 1
                 loss_val = float(loss)
                 step_loss.append(loss_val)
