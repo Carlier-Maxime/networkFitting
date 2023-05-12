@@ -182,7 +182,7 @@ def project(
         w_avg = np.mean(w_samples, axis=0, keepdims=True)      # [1, 1, C]
         w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device, requires_grad=True) # pylint: disable=not-callable
     else:
-        w_opt = w_start_pivot
+        w_opt = w_start_pivot[None]
         w_opt.requires_grad_(True)
 
     # Load VGG16 feature detector.
@@ -245,7 +245,7 @@ def project(
         pbar.update()
         if verbose: pbar.set_postfix_str(f'loss: {float(loss):<5.2f}')
     if close_pbar: pbar.close()
-    return all_images, (w_opt.detach()[0] if w_start_pivot==None else w_opt)
+    return all_images, w_opt.detach()[0]
 
 
 @click.command()
