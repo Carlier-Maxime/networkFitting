@@ -79,7 +79,7 @@ class SingleIDCoach(BaseCoach):
             if pbar1.n==0:
                 pbar2.total = inv_steps
                 pbar2.n = inv_steps
-            elif pbar1.n==max_images:
+            if pbar1.n!=max_images-1:
                 pbar3.reset()
                 pbar2.reset()
             pbar1.update()
