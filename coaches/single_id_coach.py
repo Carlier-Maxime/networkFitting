@@ -1,4 +1,3 @@
-import imageio
 import torch
 from tqdm import tqdm
 from configs import hyperparameters
@@ -17,23 +16,13 @@ class SingleIDCoach(BaseCoach):
         pbar1 = tqdm(total=max_images, desc='fitting', unit='image', disable=(not self.verbose))
         pbar2 = tqdm(total=first_inv_steps, desc='optimization Latent', unit='step', disable=(not self.verbose))
         pbar3 = tqdm(total=pti_steps, desc='pivotal tuning', unit='step', disable=(not self.verbose))
-        if self.save_video_latent:
-            videoOptiLatent = imageio.get_writer(f'{self.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
-            videoResultLatent = imageio.get_writer(f'{self.outdir}/resultLatent.mp4', mode='I', fps=10, codec='libx264', bitrate='16M')
-        if self.save_video_pti:
-            videoFittingSeed = imageio.get_writer(f'{self.outdir}/fitting_seed.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
-            videoFittingTarget = imageio.get_writer(f'{self.outdir}/fitting_target.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+        self.open_videos()
         for fname, image in self.data_loader:
-            w_imgs=[]
-            wrimgs=[]
             seed_images=[]
             target_images=[]
             image_name = fname[0]
             if self.image_counter >= max_images: break
-            imgs, w_pivot = self.get_inversions(image_name, image, (inv_steps if w_pivot!=None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar2)
-            if self.save_video_latent:
-                w_imgs += imgs
-                wrimgs.append(imgs[-1])
+            w_pivot = self.get_inversions(image_name, image, (inv_steps if w_pivot!=None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar2)
 
             w_pivot = w_pivot.to(self.device)
             if self.save_latent: torch.save(w_pivot, f'{self.outdir}/latent_{image_name}.pt')
@@ -66,10 +55,9 @@ class SingleIDCoach(BaseCoach):
                 pbar3.set_postfix_str(f'loss: {float(loss):<5.2f}')
             self.image_counter += 1
             if self.save_img_result:
-                if generated_images is None: generated_images_np = wrimgs[-1]
-                else:
-                    generated_images = (generated_images + 1) * (255/2)
-                    generated_images_np = generated_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+                if generated_images is None: generated_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
+                generated_images = (generated_images + 1) * (255/2)
+                generated_images_np = generated_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
                 Image.fromarray(generated_images_np, 'RGBA' if generated_images_np.shape[2]==4 else 'RGB').save(f'{self.outdir}/project_{image_name}.png')
             del generated_images
             if pbar1.n==0:
@@ -79,22 +67,12 @@ class SingleIDCoach(BaseCoach):
                 pbar3.reset()
                 pbar2.reset()
             pbar1.update()
-            if self.save_video_latent:
-                self.video_append(videoOptiLatent, w_imgs)
-                self.video_append(videoResultLatent, wrimgs)
 
             if self.save_video_pti:
-                self.video_append(videoFittingSeed, seed_images)
-                self.video_append(videoFittingTarget, target_images)
+                self.video_append(self.videoFittingSeed, seed_images)
+                self.video_append(self.videoFittingTarget, target_images)
         pbar1.close()
         pbar2.close()
         pbar3.close()
-        if self.save_video_latent:
-            videoOptiLatent.close()
-            videoResultLatent.close()
-
-        if self.save_video_pti:
-            videoFittingSeed.close()
-            videoResultLatent.close()
-
+        self.close_videos()
         if pti_steps>0: torch.save(self.G, f'{self.outdir}/network.pt')

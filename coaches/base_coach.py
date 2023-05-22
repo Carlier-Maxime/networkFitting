@@ -47,7 +47,11 @@ class BaseCoach:
     def get_inversions(self, image_name, image, num_steps:int=1000, w_start_pivot=None, seed:int=64, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False, pbar=None):
         if image_name in self.w_pivots: return self.w_pivots[image_name]
         w = self.load_inversions(image_name) if self.load_w_pivot else None
-        if w is None: w = project(self.G, image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar)
+        if w is None: 
+            imgs, w = project(self.G, image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar)
+            if self.save_video_latent:
+                self.video_append(self.videoOptiLatent, imgs)
+                self.video_append(self.videoResultLatent, [imgs[-1]])
         self.w_pivots[image_name] = w
         return w
 
@@ -95,3 +99,19 @@ class BaseCoach:
     
     def video_append(self, video, imgs):
         for synth_image in imgs: video.append_data(np.array(synth_image))
+
+    def open_videos(self):
+        if self.save_video_latent:
+            self.videoOptiLatent = imageio.get_writer(f'{self.outdir}/optiLatent.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+            self.videoResultLatent = imageio.get_writer(f'{self.outdir}/resultLatent.mp4', mode='I', fps=10, codec='libx264', bitrate='16M')
+        if self.save_video_pti:
+            self.videoFittingSeed = imageio.get_writer(f'{self.outdir}/fitting_seed.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+            self.videoFittingTarget = imageio.get_writer(f'{self.outdir}/fitting_target.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
+
+    def close_videos(self):
+        if self.save_video_latent:
+            self.videoOptiLatent.close()
+            self.videoResultLatent.close()
+        if self.save_video_pti:
+            self.videoFittingSeed.close()
+            self.videoResultLatent.close()
