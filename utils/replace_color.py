@@ -20,6 +20,24 @@ def rgb2hsv(rgb: torch.Tensor) -> torch.Tensor:
     return hsv
 
 
+def hsv2rgb(hsv: torch.Tensor) -> torch:
+    h60 = hsv[0] / 60
+    i = int(h60) % 6
+    f = h60 - i
+    v = hsv[2]
+    l = v * (1 - hsv[1])
+    m = v * (1 - f * hsv[1])
+    n = v * (1 - (1 - f) * hsv[1])
+    if i == 0: rgb = [v, n, l]
+    elif i == 1: rgb = [m, v, l]
+    elif i == 2: rgb = [l, v, n]
+    elif i == 3: rgb = [l, m, v]
+    elif i == 4: rgb = [n, l, v]
+    elif i == 5: rgb = [v, l, m]
+    else: raise ValueError()
+    return torch.tensor(rgb, device=hsv.device)*255
+
+
 def replaceColor(imgs, imgs_new_color, color, epsilon):
     assert imgs.shape == imgs_new_color.shape, f'Shape {imgs.shape} not equal {imgs_new_color.shape}'
     assert color.shape == torch.Size([3])
