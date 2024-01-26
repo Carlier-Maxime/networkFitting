@@ -5,6 +5,21 @@ import numpy as np
 import os
 
 
+def rgb2hsv(rgb: torch.Tensor) -> torch.Tensor:
+    rgb = rgb.to(torch.float) / 255
+    hsv = torch.zeros(3, device=rgb.device, dtype=rgb.dtype)
+    max_c = rgb.max()
+    min_c = rgb.min()
+    delta_c = max_c - min_c
+    if max_c == min_c: pass
+    elif max_c == rgb[0]: hsv[0] = 60 * ((rgb[1] - rgb[2]) / delta_c) + 360 % 360
+    elif max_c == rgb[1]: hsv[0] = 60 * ((rgb[2] - rgb[0]) / delta_c) + 120
+    elif max_c == rgb[2]: hsv[0] = 60 * ((rgb[0] - rgb[1]) / delta_c) + 240
+    hsv[1] = 0 if max == 0 else (1 - min_c / max_c)
+    hsv[2] = max_c
+    return hsv
+
+
 def replaceColor(imgs, imgs_new_color, color, epsilon):
     assert imgs.shape == imgs_new_color.shape, f'Shape {imgs.shape} not equal {imgs_new_color.shape}'
     assert color.shape == torch.Size([3])
