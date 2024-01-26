@@ -1,7 +1,8 @@
 import click
 import torch
 from PIL import Image
-from torchvision.transforms import transforms
+import numpy as np
+import os
 
 def replaceColor(imgs,imgs_new_color,color,epsilon):
     assert imgs.shape == imgs_new_color.shape, f'Shape {imgs.shape} not equal {imgs_new_color.shape}'
@@ -30,10 +31,7 @@ def getMask(imgs, color, epsilon):
     return cond.permute(0,3,1,2)
 
 def loadImg(path):
-    img = Image.open(path).convert('RGB')
-    img = transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])(img)
-    img = (img + 1) * (255/2)
-    return img.clamp(0,255)
+    return torch.from_numpy(np.array(Image.open(path).convert('RGB'))).permute(2, 0, 1)
 
 
 @click.command()
@@ -44,6 +42,7 @@ def loadImg(path):
 @click.option('--color', help='a color list, value of composante in float range [0.,255.]')
 @click.option('--outdir', default='out')
 def main(img1_path, img2_path, device_name, epsilon, color, outdir):
+    os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
     img1 = loadImg(img1_path).to(device)[None]
     img2 = loadImg(img2_path).to(device)[None]
