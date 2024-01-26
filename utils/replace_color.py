@@ -29,10 +29,7 @@ def maskColor(imgs, color, epsilon):
 def getMask(imgs, color, epsilon):
     imgs = imgs.permute(0, 2, 3, 1)
     cond = (imgs >= (color - epsilon)) & (imgs <= (color + epsilon))
-    cond[:, :, :, 0] = cond[:, :, :, 0] & cond[:, :, :, 1] & cond[:, :, :, 2]
-    cond[:, :, :, 1] = cond[:, :, :, 0]
-    cond[:, :, :, 2] = cond[:, :, :, 0]
-    return cond.permute(0, 3, 1, 2)
+    return cond.all(axis=3)[:, None, :, :].repeat(1, imgs.shape[-1], 1, 1)
 
 
 def loadImg(path):
