@@ -30,22 +30,22 @@ def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
     return color
 
 
-def hsv2rgb(hsv: torch.Tensor) -> torch:
-    h60 = hsv[0] / 60
-    i = int(h60) % 6
+def hsv2rgb(color: torch.Tensor) -> torch:
+    if len(color.shape) == 1: color = color[None, None, None]
+    h60 = (color[:, 0] / 60)
+    i = h60.to(torch.uint8) % 6
     f = h60 - i
-    v = hsv[2]
-    l = v * (1 - hsv[1])
-    m = v * (1 - f * hsv[1])
-    n = v * (1 - (1 - f) * hsv[1])
-    if i == 0: rgb = [v, n, l]
-    elif i == 1: rgb = [m, v, l]
-    elif i == 2: rgb = [l, v, n]
-    elif i == 3: rgb = [l, m, v]
-    elif i == 4: rgb = [n, l, v]
-    elif i == 5: rgb = [v, l, m]
-    else: raise ValueError()
-    return torch.tensor(rgb, device=hsv.device)*255
+    v = color[:, 2]
+    l = v * (1 - color[:, 1])
+    m = v * (1 - f * color[:, 1])
+    n = v * (1 - (1 - f) * color[:, 1])
+    results = [[v, n, l], [m, v, l], [l, v, n], [l, m, v], [n, l, v], [v, l, m]]
+    color = color.permute(0, 2, 3, 1)
+    for j in range(6):
+        mask = i == j
+        r, g, b = results[j]
+        color[mask] = torch.stack([r[mask], g[mask], b[mask]], axis=1)
+    return color.permute(0, 3, 1, 2)*255
 
 
 def replaceColor(imgs, imgs_new_color, color, epsilon):
