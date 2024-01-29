@@ -105,6 +105,8 @@ def main(img1_path, img2_path, device_name, epsilon, color, outdir, type):
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
     imgR = replaceColor(img1, img2, color, epsilon)
+    if type == 'hsv':
+        imgR = hsv2rgb(imgR)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{outdir}/replaced.png')
 
