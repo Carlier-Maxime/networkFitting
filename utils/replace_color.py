@@ -7,7 +7,10 @@ import os
 
 def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
     color = color.to(torch.float) / 255
-    if len(color.shape) == 1: color = color[None, :, None, None]
+    flat = False
+    if len(color.shape) == 1:
+        color = color[None, :, None, None]
+        flat = True
     max_c = color.max(axis=1).values
     min_c = color.min(axis=1).values
     delta_c = max_c - min_c
@@ -26,11 +29,14 @@ def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
     sat_mask = ~sat_mask
     color[:, 1][sat_mask] = 1 - min_c[sat_mask] / max_c[sat_mask]
     color[:, 2] = max_c
-    return color
+    return color.flatten() if flat else color
 
 
 def hsv2rgb(color: torch.Tensor) -> torch:
-    if len(color.shape) == 1: color = color[None, :, None, None]
+    flat = False
+    if len(color.shape) == 1:
+        color = color[None, :, None, None]
+        flat = True
     h60 = (color[:, 0] / 60)
     i = h60.to(torch.uint8) % 6
     f = h60 - i
@@ -44,7 +50,8 @@ def hsv2rgb(color: torch.Tensor) -> torch:
         mask = i == j
         r, g, b = results[j]
         color[mask] = torch.stack([r[mask], g[mask], b[mask]], axis=1)
-    return color.permute(0, 3, 1, 2)*255
+    color = color.permute(0, 3, 1, 2)*255
+    return color.flatten() if flat else color
 
 
 def replaceColor(imgs, imgs_new_color, color, epsilon):
@@ -89,6 +96,12 @@ def loadImg(path):
 def main(img1_path, img2_path, device_name, epsilon, color, outdir, type):
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
+    rgb = torch.tensor([92, 101, 51], device=device)
+    print(rgb)
+    hsv = rgb2hsv(rgb)
+    print(hsv)
+    print(hsv2rgb(hsv))
+    exit()
     img1 = loadImg(img1_path).to(device)[None]
     img2 = loadImg(img2_path).to(device)[None]
     if type == 'hsv':
