@@ -25,10 +25,7 @@ def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
     color[:, 0][is_r] = (60 * ((color[:, 1][is_r] - color[:, 2][is_r]) / delta_c[is_r]) + 360) % 360
     color[:, 0][is_g] = 60 * ((color[:, 2][is_g] - color[:, 0][is_g]) / delta_c[is_g]) + 120
     color[:, 0][is_b] = 60 * ((color[:, 0][is_b] - color[:, 1][is_b]) / delta_c[is_b]) + 240
-    sat_mask = max_c == 0
-    color[:, 1][sat_mask] = 0
-    sat_mask = ~sat_mask
-    color[:, 1][sat_mask] = 1 - min_c[sat_mask] / max_c[sat_mask]
+    color[:, 1] = torch.where(max_c == 0, 0, 1 - min_c / max_c)
     color[:, 2] = max_c
     return color.flatten() if flat else color
 
