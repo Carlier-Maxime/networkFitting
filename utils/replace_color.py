@@ -73,14 +73,18 @@ def loadImg(path):
 @click.option('--img1', 'img1_path', type=str)
 @click.option('--img2', 'img2_path', type=str)
 @click.option('--device', 'device_name', default='cuda', type=torch.device)
-@click.option('--epsilon')
-@click.option('--color', help='a color list, value of composante in float range [0.,255.]')
+@click.option('--epsilon', metavar='[color|float]')
+@click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str)
 @click.option('--outdir', default='out')
-def main(img1_path, img2_path, device_name, epsilon, color, outdir):
+@click.option('--type', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
+def main(img1_path, img2_path, device_name, epsilon, color, outdir, type):
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
     img1 = loadImg(img1_path).to(device)[None]
     img2 = loadImg(img2_path).to(device)[None]
+    if type == 'hsv':
+        img1 = rgb2hsv(img1)
+        img2 = rgb2hsv(img2)
     color = color[1:-1].split(',')
     for i in range(len(color)): color[i] = float(color[i])
     color = torch.tensor(color).to(device)
