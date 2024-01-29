@@ -14,14 +14,15 @@ def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
     max_c = color.max(axis=1).values
     min_c = color.min(axis=1).values
     delta_c = max_c - min_c
-    bad = max_c != min_c
+    is_eq = max_c == min_c
+    bad = ~is_eq
     is_r = (max_c == color[:, 0]) & bad
     bad &= ~is_r
     is_g = (max_c == color[:, 1]) & bad
     bad &= ~is_g
     is_b = (max_c == color[:, 2]) & bad
-    color[:, 0][~bad] = 0
-    color[:, 0][is_r] = 60 * ((color[:, 1][is_r] - color[:, 2][is_r]) / delta_c[is_r]) + 360 % 360
+    color[:, 0][is_eq] = 0
+    color[:, 0][is_r] = (60 * ((color[:, 1][is_r] - color[:, 2][is_r]) / delta_c[is_r]) + 360) % 360
     color[:, 0][is_g] = 60 * ((color[:, 2][is_g] - color[:, 0][is_g]) / delta_c[is_g]) + 120
     color[:, 0][is_b] = 60 * ((color[:, 0][is_b] - color[:, 1][is_b]) / delta_c[is_b]) + 240
     sat_mask = max_c == 0
@@ -96,12 +97,6 @@ def loadImg(path):
 def main(img1_path, img2_path, device_name, epsilon, color, outdir, type):
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
-    rgb = torch.tensor([92, 101, 51], device=device)
-    print(rgb)
-    hsv = rgb2hsv(rgb)
-    print(hsv)
-    print(hsv2rgb(hsv))
-    exit()
     img1 = loadImg(img1_path).to(device)[None]
     img2 = loadImg(img2_path).to(device)[None]
     if type == 'hsv':
