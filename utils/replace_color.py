@@ -5,19 +5,29 @@ import numpy as np
 import os
 
 
-def rgb2hsv(rgb: torch.Tensor) -> torch.Tensor:
-    rgb = rgb.to(torch.float) / 255
-    hsv = torch.zeros(3, device=rgb.device, dtype=rgb.dtype)
-    max_c = rgb.max()
-    min_c = rgb.min()
+def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
+    color = color.to(torch.float) / 255
+    if len(color.shape) == 1: color = color[None, None, None]
+    max_c = color.max(axis=1).values
+    min_c = color.min(axis=1).values
     delta_c = max_c - min_c
-    if max_c == min_c: pass
-    elif max_c == rgb[0]: hsv[0] = 60 * ((rgb[1] - rgb[2]) / delta_c) + 360 % 360
-    elif max_c == rgb[1]: hsv[0] = 60 * ((rgb[2] - rgb[0]) / delta_c) + 120
-    elif max_c == rgb[2]: hsv[0] = 60 * ((rgb[0] - rgb[1]) / delta_c) + 240
-    hsv[1] = 0 if max == 0 else (1 - min_c / max_c)
-    hsv[2] = max_c
-    return hsv
+    bad = max_c != min_c
+    is_r = (max_c == color[:, 0]) == bad
+    bad = bad != is_r
+    is_g = (max_c == color[:, 1]) == bad
+    bad = bad != is_g
+    is_b = (max_c == color[:, 2]) == bad
+    color = color.permute(0, 2, 3, 1)
+    color[is_r][:, 0] = 60 * ((color[is_r][:, 1] - color[is_r][:, 2]) / delta_c[is_r]) + 360 % 360
+    color[is_g][:, 0] = 60 * ((color[is_g][:, 2] - color[is_g][:, 0]) / delta_c[is_g]) + 120
+    color[is_b][:, 0] = 60 * ((color[is_b][:, 0] - color[is_b][:, 1]) / delta_c[is_b]) + 240
+    sat_mask = max_c == 0
+    color[sat_mask][:, 1] = 0
+    sat_mask = ~sat_mask
+    color[sat_mask][:, 1] = 1 - min_c[sat_mask] / max_c[sat_mask]
+    color = color.permute(0, 3, 1, 2)
+    color[:, 2] = max_c
+    return color
 
 
 def hsv2rgb(hsv: torch.Tensor) -> torch:
