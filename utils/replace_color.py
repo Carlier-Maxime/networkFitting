@@ -3,6 +3,7 @@ import torch
 from PIL import Image
 import numpy as np
 import os
+import torch.nn.functional as F
 
 
 def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
@@ -52,10 +53,10 @@ def hsv2rgb(color: torch.Tensor) -> torch:
     return color.flatten() if flat else color
 
 
-def replaceColor(imgs, imgs_new_color, color, epsilon):
+def replaceColor(imgs, imgs_new_color, color, epsilon, grow_size=1):
     assert imgs.shape == imgs_new_color.shape, f'Shape {imgs.shape} not equal {imgs_new_color.shape}'
     assert color.shape == torch.Size([3])
-    cond = getMask(imgs, color, epsilon)
+    cond = getMask(imgs, color, epsilon, grow_size)
     imgs[cond] = imgs_new_color[cond]
     return imgs
 
@@ -73,10 +74,13 @@ def maskColor(imgs, color, epsilon):
     return imgs * mask
 
 
-def getMask(imgs, color, epsilon):
+def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
-    cond = (imgs >= (color - epsilon)) & (imgs <= (color + epsilon))
-    return cond.all(axis=3)[:, None, :, :].repeat(1, imgs.shape[-1], 1, 1)
+    cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)[:, None]
+    if grow_size > 1:
+        kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
+        cond = torch.gt(F.conv2d(cond.to(torch.float), kernel, padding='same'), 0)
+    return cond.repeat(1, imgs.shape[-1], 1, 1)
 
 
 def loadImg(path):
@@ -90,13 +94,14 @@ def loadImg(path):
 @click.option('--epsilon', metavar='[color|float]')
 @click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str)
 @click.option('--outdir', default='out')
-@click.option('--type', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
-def main(img1_path, img2_path, device_name, epsilon, color, outdir, type):
+@click.option('--type', 'type_c', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
+@click.option('--grow', 'grow_size', help='dilating a zone of specific color for prevent outline mistake', type=click.IntRange(min=1), default=1)
+def main(img1_path, img2_path, device_name, epsilon, color, outdir, type_c, grow_size):
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
     img1 = loadImg(img1_path).to(device)[None]
     img2 = loadImg(img2_path).to(device)[None]
-    if type == 'hsv':
+    if type_c == 'hsv':
         img1 = rgb2hsv(img1)
         img2 = rgb2hsv(img2)
     color = color[1:-1].split(',')
@@ -108,8 +113,8 @@ def main(img1_path, img2_path, device_name, epsilon, color, outdir, type):
         epsilon = epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
-    imgR = replaceColor(img1, img2, color, epsilon)
-    if type == 'hsv':
+    imgR = replaceColor(img1, img2, color, epsilon, grow_size)
+    if type_c == 'hsv':
         imgR = hsv2rgb(imgR)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{outdir}/replaced.png')
