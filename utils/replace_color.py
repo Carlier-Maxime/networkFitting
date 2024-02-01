@@ -49,7 +49,7 @@ def hsv2rgb(color: torch.Tensor) -> torch:
         mask = i == j
         r, g, b = results[j]
         color[mask] = torch.stack([r[mask], g[mask], b[mask]], axis=1)
-    color = color.permute(0, 3, 1, 2)*255
+    color = color.permute(0, 3, 1, 2) * 255
     return color.flatten() if flat else color
 
 
@@ -95,12 +95,13 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
         kernel = torch.ones(1, 1, erase_size, erase_size, device=cond.device)
         nbPixelsIgnored = F.conv2d(cond[:, None].to(torch.float), kernel, padding='same')[:, 0]
         sumPixelsKernel = F.conv2d(imgs * ~cond, kernel.repeat((imgs.shape[1], 1, 1, 1)), padding='same', groups=imgs.shape[1])
-        div = erase_size**2 - nbPixelsIgnored
+        div = erase_size ** 2 - nbPixelsIgnored
         nextCond = div == 0
         cond = cond ^ nextCond
         imgs.permute(0, 2, 3, 1)[cond] = (sumPixelsKernel.permute(0, 2, 3, 1)[cond].permute(1, 0) / div[cond]).permute(1, 0)
         cond = nextCond
     return imgs
+
 
 @click.command()
 @click.option('--img1', 'img1_path', type=str)
@@ -130,11 +131,16 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
         epsilon = epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
-    if mode == 'mask': imgR = maskColor(img1, color, epsilon, grow_size)
-    elif mode == 'replace': imgR = replaceColor(img1, img2, color, epsilon, grow_size)
-    elif mode == 'paste': imgR = pasteColor(img1, img2, color, epsilon, grow_size)
-    elif mode == 'erase': imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
-    else: raise ValueError('mode unknown : '+mode)
+    if mode == 'mask':
+        imgR = maskColor(img1, color, epsilon, grow_size)
+    elif mode == 'replace':
+        imgR = replaceColor(img1, img2, color, epsilon, grow_size)
+    elif mode == 'paste':
+        imgR = pasteColor(img1, img2, color, epsilon, grow_size)
+    elif mode == 'erase':
+        imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
+    else:
+        raise ValueError('mode unknown : ' + mode)
     if type_c == 'hsv': imgR = hsv2rgb(imgR)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{outdir}/replaced.png')
