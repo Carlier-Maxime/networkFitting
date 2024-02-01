@@ -61,16 +61,16 @@ def replaceColor(imgs, imgs_new_color, color, epsilon, grow_size=1):
     return imgs
 
 
-def pasteColor(imgs_color, imgs, color, epsilon):
+def pasteColor(imgs_color, imgs, color, epsilon, grow_size=1):
     assert imgs_color.shape == imgs.shape, f'Shape {imgs_color.shape} not equal {imgs.shape}'
     assert color.shape == torch.Size([3])
-    cond = getMask(imgs_color, color, epsilon)
+    cond = getMask(imgs_color, color, epsilon, grow_size)
     imgs.permute(0, 2, 3, 1)[cond] = imgs_color.permute(0, 2, 3, 1)[cond]
     return imgs
 
 
-def maskColor(imgs, color, epsilon):
-    mask = ~getMask(imgs, color, epsilon)
+def maskColor(imgs, color, epsilon, grow_size=1):
+    mask = ~getMask(imgs, color, epsilon, grow_size)
     return imgs * mask
 
 
@@ -106,20 +106,21 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
 @click.command()
 @click.option('--img1', 'img1_path', type=str)
 @click.option('--img2', 'img2_path', type=str)
+@click.option('--mode', help='mode used for change color', type=click.Choice(['mask', 'replace', 'paste', 'erase']), default='replace')
 @click.option('--device', 'device_name', default='cuda', type=torch.device)
 @click.option('--epsilon', metavar='[color|float]')
 @click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str)
 @click.option('--outdir', default='out')
 @click.option('--type', 'type_c', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
 @click.option('--grow', 'grow_size', help='dilating a zone of specific color for prevent outline mistake', type=click.IntRange(min=1), default=1)
-def main(img1_path, img2_path, device_name, epsilon, color, outdir, type_c, grow_size):
+def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size):
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
     img1 = loadImg(img1_path).to(device)[None]
-    img2 = loadImg(img2_path).to(device)[None]
+    img2 = loadImg(img2_path).to(device)[None] if mode in ['replace', 'paste'] else None
     if type_c == 'hsv':
         img1 = rgb2hsv(img1)
-        img2 = rgb2hsv(img2)
+        img2 = None if img2 is None else rgb2hsv(img2)
     color = color[1:-1].split(',')
     for i in range(len(color)): color[i] = float(color[i])
     color = torch.tensor(color).to(device)
@@ -129,9 +130,12 @@ def main(img1_path, img2_path, device_name, epsilon, color, outdir, type_c, grow
         epsilon = epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
-    imgR = replaceColor(img1, img2, color, epsilon, grow_size)
-    if type_c == 'hsv':
-        imgR = hsv2rgb(imgR)
+    if mode == 'mask': imgR = maskColor(img1, color, epsilon, grow_size)
+    elif mode == 'replace': imgR = replaceColor(img1, img2, color, epsilon, grow_size)
+    elif mode == 'paste': imgR = pasteColor(img1, img2, color, epsilon, grow_size)
+    elif mode == 'erase': imgR = eraseColor(img1, color, epsilon, grow_size)
+    else: raise ValueError('mode unknown : '+mode)
+    if type_c == 'hsv': imgR = hsv2rgb(imgR)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{outdir}/replaced.png')
 
