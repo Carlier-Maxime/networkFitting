@@ -92,16 +92,15 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
     assert erase_size > 1
     cond = getMask(imgs, color, epsilon, grow_size)
     while cond.any():
-        kernel = torch.ones(cond.shape[0], 1, erase_size, erase_size, device=cond.device)
+        kernel = torch.ones(1, 1, erase_size, erase_size, device=cond.device)
         nbPixelsIgnored = F.conv2d(cond[:, None].to(torch.float), kernel, padding='same')[:, 0]
-        sumPixelsKernel = F.conv2d(imgs * ~cond, kernel.repeat((imgs.shape[1], 1, 1, 1)), padding='same', groups=3)
+        sumPixelsKernel = F.conv2d(imgs * ~cond, kernel.repeat((imgs.shape[1], 1, 1, 1)), padding='same', groups=imgs.shape[1])
         div = erase_size**2 - nbPixelsIgnored
         nextCond = div == 0
         cond = cond ^ nextCond
         imgs.permute(0, 2, 3, 1)[cond] = (sumPixelsKernel.permute(0, 2, 3, 1)[cond].permute(1, 0) / div[cond]).permute(1, 0)
         cond = nextCond
     return imgs
-
 
 @click.command()
 @click.option('--img1', 'img1_path', type=str)
