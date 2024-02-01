@@ -57,7 +57,7 @@ def replaceColor(imgs, imgs_new_color, color, epsilon, grow_size=1):
     assert imgs.shape == imgs_new_color.shape, f'Shape {imgs.shape} not equal {imgs_new_color.shape}'
     assert color.shape == torch.Size([3])
     cond = getMask(imgs, color, epsilon, grow_size)
-    imgs[cond] = imgs_new_color[cond]
+    imgs.permute(0, 2, 3, 1)[cond] = imgs_new_color.permute(0, 2, 3, 1)[cond]
     return imgs
 
 
@@ -65,7 +65,7 @@ def pasteColor(imgs_color, imgs, color, epsilon):
     assert imgs_color.shape == imgs.shape, f'Shape {imgs_color.shape} not equal {imgs.shape}'
     assert color.shape == torch.Size([3])
     cond = getMask(imgs_color, color, epsilon)
-    imgs[cond] = imgs_color[cond]
+    imgs.permute(0, 2, 3, 1)[cond] = imgs_color.permute(0, 2, 3, 1)[cond]
     return imgs
 
 
@@ -76,11 +76,11 @@ def maskColor(imgs, color, epsilon):
 
 def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
-    cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)[:, None]
+    cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
-        cond = torch.gt(F.conv2d(cond.to(torch.float), kernel, padding='same'), 0)
-    return cond.repeat(1, imgs.shape[-1], 1, 1)
+        cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
+    return cond
 
 
 def loadImg(path):
