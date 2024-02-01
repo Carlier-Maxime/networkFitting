@@ -113,7 +113,8 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
 @click.option('--outdir', default='out')
 @click.option('--type', 'type_c', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
 @click.option('--grow', 'grow_size', help='dilating a zone of specific color for prevent outline mistake', type=click.IntRange(min=1), default=1)
-def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size):
+@click.option('--erase_size', help='size of kernel used for calcul average of surrounding pixels', type=click.IntRange(min=2), default=5)
+def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size):
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
     img1 = loadImg(img1_path).to(device)[None]
@@ -133,7 +134,7 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
     if mode == 'mask': imgR = maskColor(img1, color, epsilon, grow_size)
     elif mode == 'replace': imgR = replaceColor(img1, img2, color, epsilon, grow_size)
     elif mode == 'paste': imgR = pasteColor(img1, img2, color, epsilon, grow_size)
-    elif mode == 'erase': imgR = eraseColor(img1, color, epsilon, grow_size)
+    elif mode == 'erase': imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
     else: raise ValueError('mode unknown : '+mode)
     if type_c == 'hsv': imgR = hsv2rgb(imgR)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
