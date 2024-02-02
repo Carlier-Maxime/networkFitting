@@ -74,19 +74,19 @@ def maskColor(imgs, color, epsilon, grow_size=1):
     return imgs * mask
 
 
+def getSubIndices(indices, index):
+    indices_v, indices_i = indices[index].sort()
+    split_indices = torch.where((indices_v[1:] - indices_v[:-1]) > 2)[0] + 1
+    start_indices = torch.cat((torch.tensor([0], device=indices.device), split_indices))
+    end_indices = torch.cat([split_indices, torch.tensor([indices.shape[1]], device=indices.device)])
+    return [indices[:, indices_i[start:end]] for start, end in zip(start_indices, end_indices)]
+
+
 def getCentersOfMarkers(mask):
-    device = mask.device
     indices = torch.where(mask)
     indices = torch.stack((indices[1], indices[2]))
-    split_indices = torch.where((indices[0, 1:] - indices[0, :-1]) > 2)[0] + 1
-    start_indices = torch.cat((torch.tensor([0], device=device), split_indices))
-    end_indices = torch.cat([split_indices, torch.tensor([indices.shape[1]], device=device)])
-    sub_indicesY = [indices[:, start:end] for start, end in zip(start_indices, end_indices)]
-    indicesX_v, indicesX_i = indices[1].sort()
-    split_indices = torch.where((indicesX_v[1:] - indicesX_v[:-1]) > 2)[0] + 1
-    start_indices = torch.cat((torch.tensor([0], device=device), split_indices))
-    end_indices = torch.cat([split_indices, torch.tensor([indices.shape[1]], device=device)])
-    sub_indicesX = [indices[:, indicesX_i[start:end]] for start, end in zip(start_indices, end_indices)]
+    sub_indicesY = getSubIndices(indices, 0)
+    sub_indicesX = getSubIndices(indices, 1)
     markers = mask.float()
     for i in range(len(sub_indicesY)): markers[:, sub_indicesY[i][0], sub_indicesY[i][1]] = i*len(sub_indicesX)+1
     for i in range(len(sub_indicesX)): markers[:, sub_indicesX[i][0], sub_indicesX[i][1]] += i
@@ -103,6 +103,7 @@ def getCentersOfMarkers(mask):
 def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
     cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
+    print(getCentersOfMarkers(cond))
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
