@@ -79,17 +79,18 @@ def getSubIndices(indices, index):
     split_indices = torch.where((indices_v[1:] - indices_v[:-1]) > 2)[0] + 1
     start_indices = torch.cat((torch.tensor([0], device=indices.device), split_indices))
     end_indices = torch.cat([split_indices, torch.tensor([indices.shape[1]], device=indices.device)])
-    return [indices[:, indices_i[start:end]] for start, end in zip(start_indices, end_indices)]
+    ranges = torch.arange(indices.shape[1], device=indices.device)[:, None]
+    return ((ranges.ge(start_indices) & ranges.lt(end_indices)) * torch.arange(len(end_indices), device=indices.device)).sum(axis=1), indices[:, indices_i]
 
 
 def getCentersOfMarkers(mask):
     indices = torch.where(mask)
     indices = torch.stack((indices[1], indices[2]))
-    sub_indicesY = getSubIndices(indices, 0)
-    sub_indicesX = getSubIndices(indices, 1)
-    markers = mask.float()
-    for i in range(len(sub_indicesY)): markers[:, sub_indicesY[i][0], sub_indicesY[i][1]] = i*len(sub_indicesX)+1
-    for i in range(len(sub_indicesX)): markers[:, sub_indicesX[i][0], sub_indicesX[i][1]] += i
+    sub_divY, sub_indicesY = getSubIndices(indices, 0)
+    sub_divX, sub_indicesX = getSubIndices(indices, 1)
+    markers = mask.long()
+    markers[:, sub_indicesY[0], sub_indicesY[1]] = sub_divY * sub_divX.unique().shape[0] + 1
+    markers[:, sub_indicesX[0], sub_indicesX[1]] += sub_divX
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
     centers = []
