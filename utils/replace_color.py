@@ -101,7 +101,10 @@ def getCentersOfMarkers(mask):
 def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
     cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
-    print(getCentersOfMarkers(cond))
+    if global_save_ccs:
+        centers = getCentersOfMarkers(cond)
+        print(f"Number of color stain detected : {len(centers)}")
+        np.save(f"{global_outdir}/centers.npy", centers.cpu().numpy())
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
@@ -128,6 +131,9 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
     return imgs
 
 
+global_outdir = None
+global_save_ccs = None
+
 @click.command()
 @click.option('--img1', 'img1_path', type=str)
 @click.option('--img2', 'img2_path', type=str)
@@ -139,7 +145,11 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
 @click.option('--type', 'type_c', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
 @click.option('--grow', 'grow_size', help='dilating a zone of specific color for prevent outline mistake', type=click.IntRange(min=1), default=1)
 @click.option('--erase_size', help='size of kernel used for calcul average of surrounding pixels', type=click.IntRange(min=2), default=5)
-def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size):
+@click.option('--save-ccs', help='Save a center of color stain to a numpy file', is_flag=True, default=False)
+def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size, save_ccs):
+    global global_outdir, global_save_ccs
+    global_outdir = outdir
+    global_save_ccs = save_ccs
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
     img1 = loadImg(img1_path).to(device)[None]
