@@ -108,6 +108,8 @@ def getMask(imgs, color, epsilon, grow_size=1):
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
+    if global_save_mask:
+        Image.fromarray((cond.to(torch.uint8)*255)[0].cpu().numpy()).save(f"{global_outdir}/mask.png")
     return cond
 
 
@@ -133,6 +135,7 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
 
 global_outdir = None
 global_save_ccs = None
+global_save_mask = None
 
 @click.command()
 @click.option('--img1', 'img1_path', type=str)
@@ -146,10 +149,12 @@ global_save_ccs = None
 @click.option('--grow', 'grow_size', help='dilating a zone of specific color for prevent outline mistake', type=click.IntRange(min=1), default=1)
 @click.option('--erase_size', help='size of kernel used for calcul average of surrounding pixels', type=click.IntRange(min=2), default=5)
 @click.option('--save-ccs', help='Save a center of color stain to a numpy file', is_flag=True, default=False)
-def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size, save_ccs):
-    global global_outdir, global_save_ccs
+@click.option('--save-mask', help='Save a mask to a PNG', is_flag=True, default=False)
+def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size, save_ccs, save_mask):
+    global global_outdir, global_save_ccs, global_save_mask
     global_outdir = outdir
     global_save_ccs = save_ccs
+    global_save_mask = save_mask
     os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
     img1 = loadImg(img1_path).to(device)[None]
