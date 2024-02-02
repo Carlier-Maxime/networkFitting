@@ -74,6 +74,32 @@ def maskColor(imgs, color, epsilon, grow_size=1):
     return imgs * mask
 
 
+def getCentersOfMarkers(mask):
+    device = mask.device
+    indices = torch.where(mask)
+    indices = torch.stack((indices[1], indices[2]))
+    split_indices = torch.where((indices[0, 1:] - indices[0, :-1]) > 2)[0] + 1
+    start_indices = torch.cat((torch.tensor([0], device=device), split_indices))
+    end_indices = torch.cat([split_indices, torch.tensor([indices.shape[1]], device=device)])
+    sub_indicesY = [indices[:, start:end] for start, end in zip(start_indices, end_indices)]
+    indicesX_v, indicesX_i = indices[1].sort()
+    split_indices = torch.where((indicesX_v[1:] - indicesX_v[:-1]) > 2)[0] + 1
+    start_indices = torch.cat((torch.tensor([0], device=device), split_indices))
+    end_indices = torch.cat([split_indices, torch.tensor([indices.shape[1]], device=device)])
+    sub_indicesX = [indices[:, indicesX_i[start:end]] for start, end in zip(start_indices, end_indices)]
+    markers = mask.float()
+    for i in range(len(sub_indicesY)): markers[:, sub_indicesY[i][0], sub_indicesY[i][1]] = i*len(sub_indicesX)+1
+    for i in range(len(sub_indicesX)): markers[:, sub_indicesX[i][0], sub_indicesX[i][1]] += i
+    markers_id = markers.unique()
+    markers_id = markers_id[markers_id > 0]
+    centers = []
+    for m_id in markers_id:
+        center = torch.where(markers.eq(m_id))
+        center = torch.stack([center[1], center[2]]).float().mean(axis=1)
+        centers.append(center)
+    return torch.stack(centers)
+
+
 def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
     cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
