@@ -93,12 +93,9 @@ def getCentersOfMarkers(mask):
     markers[:, sub_indicesX[0], sub_indicesX[1]] += sub_divX
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
-    centers = []
-    for m_id in markers_id:
-        center = torch.where(markers.eq(m_id))
-        center = torch.stack([center[1], center[2]]).float().mean(axis=1)
-        centers.append(center)
-    return torch.stack(centers)
+    where = torch.where(markers.eq(markers_id[..., None, None]))
+    markers = torch.stack([where[1], where[2]]).split(where[0].unique(return_counts=True)[1].tolist(), dim=1)
+    return torch.stack([marker.float().mean(axis=1) for marker in markers])
 
 
 def getMask(imgs, color, epsilon, grow_size=1):
