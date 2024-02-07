@@ -1,3 +1,5 @@
+import time
+
 import click
 import torch
 from PIL import Image
@@ -74,25 +76,34 @@ def maskColor(imgs, color, epsilon, grow_size=1):
     return imgs * mask
 
 
-def getSubIndices(indices, index):
-    indices_v, indices_i = indices[index].sort()
-    split_indices = torch.where((indices_v[1:] - indices_v[:-1]) > 2)[0] + 1
-    start_indices = torch.cat((torch.tensor([0], device=indices.device), split_indices))
-    end_indices = torch.cat([split_indices, torch.tensor([indices.shape[1]], device=indices.device)])
-    ranges = torch.arange(indices.shape[1], device=indices.device)[:, None]
-    return ((ranges.ge(start_indices) & ranges.lt(end_indices)) * torch.arange(len(end_indices), device=indices.device)).sum(axis=1), indices[:, indices_i]
-
-
-def getCentersOfMarkers(mask):
-    indices = torch.where(mask)
-    indices = torch.stack((indices[1], indices[2]))
-    sub_divY, sub_indicesY = getSubIndices(indices, 0)
-    sub_divX, sub_indicesX = getSubIndices(indices, 1)
-    markers = mask.long()
-    markers[:, sub_indicesY[0], sub_indicesY[1]] = sub_divY * sub_divX.unique().shape[0] + 1
-    markers[:, sub_indicesX[0], sub_indicesX[1]] += sub_divX
+def getCentersOfStain(masks=torch.tensor([[[0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0]]], dtype=torch.bool, device='cuda')):
+    start_time = time.time()
+    indices = torch.where(masks)
+    indices = torch.stack((indices[1], indices[2])).split(indices[0].unique_consecutive(return_counts=True)[1].tolist(), dim=1)
+    markers = masks.long()
+    for i in range(len(indices)):
+        unique = indices[i][0].unique_consecutive(return_counts=True)
+        columns = torch.where(indices[i][0].eq(unique[0][..., None]))[1].split(unique[1].tolist())
+        prev_column = None
+        for j in range(len(columns)):
+            column = indices[i][1, columns[j]]
+            split_indices = torch.where((column[1:] - column[:-1]) > 2)[0] + 1
+            start_indices = torch.cat((torch.tensor([0], device=column.device), split_indices))
+            end_indices = torch.cat([split_indices, torch.tensor([column.shape[0]], device=column.device)])
+            ranges = torch.arange(column.shape[0], device=column.device)[:, None]
+            values = ((ranges.ge(start_indices) & ranges.lt(end_indices)) * torch.arange(len(end_indices), device=column.device)).sum(axis=1) + (j*indices[i].shape[1]) + 2
+            y = unique[0][j]
+            y_sub_1 = unique[0][j-1]
+            markers[i, y, column] = values
+            if prev_column is not None:
+                same = masks[i, y_sub_1, column] & masks[i, y, column]
+                pairs = torch.stack((values[same], markers[i, y_sub_1, column[same]]), dim=1).unique(dim=0)
+                for k in range(len(pairs)):
+                    markers[markers == pairs[k, 0]] = pairs[k, 1]
+                    pairs[pairs[:, 0] == pairs[k, 0], 0] = pairs[k, 1]
+            prev_column = column
     if global_save_mask:
-        mask_color = ((markers / markers.max()) * (256**3-1)).repeat(3, 1, 1)
+        mask_color = ((markers / markers.max()) * (256 ** 3 - 1)).repeat(3, 1, 1)
         mask_color[0] %= 256
         mask_color[1] = (mask_color[1] / 256) % 256
         mask_color[2] = (mask_color[2] / 256) / 256
@@ -102,21 +113,23 @@ def getCentersOfMarkers(mask):
     markers_id = markers_id[markers_id > 0]
     where = torch.where(markers.eq(markers_id[..., None, None]))
     markers = torch.stack([where[1], where[2]]).split(where[0].unique(return_counts=True)[1].tolist(), dim=1)
-    return torch.stack([marker.float().mean(axis=1) for marker in markers])
+    centers = torch.stack([marker.float().mean(axis=1) for marker in markers])
+    print(time.time() - start_time)
+    return centers
 
 
 def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
     cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
     if global_save_ccs:
-        centers = getCentersOfMarkers(cond)
+        centers = getCentersOfStain(cond)
         print(f"Number of color stain detected : {len(centers)}")
         np.save(f"{global_outdir}/centers.npy", centers.cpu().numpy())
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
     if global_save_mask:
-        Image.fromarray((cond.to(torch.uint8)*255)[0].cpu().numpy()).save(f"{global_outdir}/mask.png")
+        Image.fromarray((cond.to(torch.uint8) * 255)[0].cpu().numpy()).save(f"{global_outdir}/mask.png")
     return cond
 
 
@@ -143,6 +156,7 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
 global_outdir = None
 global_save_ccs = None
 global_save_mask = None
+
 
 @click.command()
 @click.option('--img1', 'img1_path', type=str)
