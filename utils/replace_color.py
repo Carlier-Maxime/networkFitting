@@ -91,6 +91,13 @@ def getCentersOfMarkers(mask):
     markers = mask.long()
     markers[:, sub_indicesY[0], sub_indicesY[1]] = sub_divY * sub_divX.unique().shape[0] + 1
     markers[:, sub_indicesX[0], sub_indicesX[1]] += sub_divX
+    if global_save_mask:
+        mask_color = ((markers / markers.max()) * (256**3-1)).repeat(3, 1, 1)
+        mask_color[0] %= 256
+        mask_color[1] = (mask_color[1] / 256) % 256
+        mask_color[2] = (mask_color[2] / 256) / 256
+        mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
+        Image.fromarray(mask_color).save(f'{global_outdir}/mask_color.png')
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
     where = torch.where(markers.eq(markers_id[..., None, None]))
