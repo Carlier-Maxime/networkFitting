@@ -89,7 +89,7 @@ def save_mask_stain(maskStains, min_light=32):
 
 def getCentersOfStain(masks=torch.tensor([[[0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0]]], dtype=torch.bool, device='cuda')):
     markers = masks.long()
-    markers[masks] = masks.unique_consecutive(return_inverse=True)[1][masks]
+    markers[masks] = torch.nn.ConstantPad2d((1, 1, 0, 0), False)(masks).unique_consecutive(return_inverse=True)[1][:, :, 1:-1][masks]
     sames = masks[:, :-1] & masks[:, 1:]
     pairs = torch.stack((markers[:, :-1][sames], markers[:, 1:][sames]), dim=1).unique(dim=0)
     for k in range(len(pairs)): markers[markers == pairs[k, 0]] = pairs[k, 1]
