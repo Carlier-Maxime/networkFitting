@@ -89,8 +89,8 @@ def save_mask_stain(maskStains, min_light=32):
 
 def getCentersOfStain(masks=torch.tensor([[[0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0]]], dtype=torch.bool, device='cuda')):
     start_time = time.time()
-    indices = torch.where(masks)
-    indices = torch.stack((indices[1], indices[2])).split(indices[0].unique_consecutive(return_counts=True)[1].tolist(), dim=1)
+    indices = torch.nonzero(masks)
+    indices = indices[:, 1:].permute(1, 0).split(indices[:, 0].unique_consecutive(return_counts=True)[1].tolist(), dim=1)
     markers = masks.long()
     for i in range(len(indices)):
         unique = indices[i][0].unique_consecutive(return_counts=True)
