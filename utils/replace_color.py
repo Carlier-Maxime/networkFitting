@@ -97,14 +97,12 @@ def getCentersOfStain(masks=torch.tensor([[[0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0,
         columns = torch.where(indices[i][0].eq(unique[0][..., None]))[1].split(unique[1].tolist())
         prev_column = None
         for j in range(len(columns)):
-            column = indices[i][1, columns[j]]
-            split_indices = torch.where((column[1:] - column[:-1]) > 2)[0] + 1
-            start_indices = torch.cat((torch.tensor([0], device=column.device), split_indices))
-            end_indices = torch.cat([split_indices, torch.tensor([column.shape[0]], device=column.device)])
-            ranges = torch.arange(column.shape[0], device=column.device)[:, None]
-            values = ((ranges.ge(start_indices) & ranges.lt(end_indices)) * torch.arange(len(end_indices), device=column.device)).sum(axis=1) + (j*indices[i].shape[1]) + 2
             y = unique[0][j]
-            y_sub_1 = unique[0][j-1]
+            y_sub_1 = unique[0][j - 1]
+            values = masks[i, y].unique_consecutive(return_counts=True)
+            values = values[1][values[0]]
+            values = torch.arange(len(values), device=values.device).repeat_interleave(values) + (j * indices[i].shape[1]) + 2
+            column = indices[i][1, columns[j]]
             markers[i, y, column] = values
             if prev_column is not None:
                 same = masks[i, y_sub_1, column] & masks[i, y, column]
