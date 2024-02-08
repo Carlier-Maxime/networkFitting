@@ -76,6 +76,15 @@ def maskColor(imgs, color, epsilon, grow_size=1):
     return imgs * mask
 
 
+def save_mask_stain(maskStains):
+    mask_color = ((maskStains / maskStains.max()) * (256 ** 3 - 1)).repeat(3, 1, 1)
+    mask_color[0] %= 256
+    mask_color[1] = (mask_color[1] / 256) % 256
+    mask_color[2] = (mask_color[2] / 256) / 256
+    mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
+    Image.fromarray(mask_color).save(f'{global_outdir}/mask_stain.png')
+
+
 def getCentersOfStain(masks=torch.tensor([[[0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0]]], dtype=torch.bool, device='cuda')):
     start_time = time.time()
     indices = torch.where(masks)
@@ -102,13 +111,7 @@ def getCentersOfStain(masks=torch.tensor([[[0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0,
                     markers[markers == pairs[k, 0]] = pairs[k, 1]
                     pairs[pairs[:, 0] == pairs[k, 0], 0] = pairs[k, 1]
             prev_column = column
-    if global_save_mask:
-        mask_color = ((markers / markers.max()) * (256 ** 3 - 1)).repeat(3, 1, 1)
-        mask_color[0] %= 256
-        mask_color[1] = (mask_color[1] / 256) % 256
-        mask_color[2] = (mask_color[2] / 256) / 256
-        mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
-        Image.fromarray(mask_color).save(f'{global_outdir}/mask_color.png')
+    if global_save_mask: save_mask_stain(markers)
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
     where = torch.where(markers.eq(markers_id[..., None, None]))
