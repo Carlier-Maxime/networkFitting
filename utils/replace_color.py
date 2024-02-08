@@ -95,13 +95,13 @@ def getCentersOfStain(masks=torch.tensor([[[0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0,
     markers[masks] = masks.unique_consecutive(return_inverse=True)[1][masks]
     for i in range(len(indices)):
         unique = indices[i][0].unique_consecutive(return_counts=True)
-        columns = torch.where(indices[i][0].eq(unique[0][..., None]))[1].split(unique[1].tolist())
-        for j in range(1, len(columns)):
+        lines = torch.where(indices[i][0].eq(unique[0][..., None]))[1].split(unique[1].tolist())
+        for j in range(1, len(lines)):
             y = unique[0][j]
             y_sub_1 = unique[0][j - 1]
-            column = indices[i][1, columns[j]]
-            same = masks[i, y_sub_1, column] & masks[i, y, column]
-            pairs = torch.stack((markers[i, y, column[same]], markers[i, y_sub_1, column[same]]), dim=1).unique(dim=0)
+            line = indices[i][1, lines[j]]
+            same = masks[i, y_sub_1, line] & masks[i, y, line]
+            pairs = torch.stack((markers[i, y, line[same]], markers[i, y_sub_1, line[same]]), dim=1).unique(dim=0)
             for k in range(len(pairs)):
                 markers[markers == pairs[k, 0]] = pairs[k, 1]
                 pairs[pairs[:, 0] == pairs[k, 0], 0] = pairs[k, 1]
