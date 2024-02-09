@@ -49,7 +49,7 @@ def hsv2rgb(color: torch.Tensor) -> torch:
     for j in range(6):
         mask = i == j
         r, g, b = results[j]
-        color[mask] = torch.stack([r[mask], g[mask], b[mask]], axis=1)
+        color[mask] = torch.stack([r[mask], g[mask], b[mask]], dim=1)
     color = color.permute(0, 3, 1, 2) * 255
     return color.flatten() if flat else color
 
