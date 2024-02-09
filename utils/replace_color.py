@@ -55,20 +55,12 @@ def hsv2rgb(color: torch.Tensor) -> torch:
     return color.flatten() if flat else color
 
 
-def replaceColor(imgs, imgs_new_color, color, epsilon, grow_size=1):
-    assert imgs.shape == imgs_new_color.shape, f'Shape {imgs.shape} not equal {imgs_new_color.shape}'
+def replaceOrPasteColor(imgs1, imgs2, color, epsilon, grow_size=1, paste: bool = False):
+    assert imgs1.shape == imgs2.shape, f'Shape {imgs1.shape} not equal {imgs2.shape}'
     assert color.shape == torch.Size([3])
-    cond = getMask(imgs, color, epsilon, grow_size)
-    imgs.permute(0, 2, 3, 1)[cond] = imgs_new_color.permute(0, 2, 3, 1)[cond]
-    return imgs
-
-
-def pasteColor(imgs_color, imgs, color, epsilon, grow_size=1):
-    assert imgs_color.shape == imgs.shape, f'Shape {imgs_color.shape} not equal {imgs.shape}'
-    assert color.shape == torch.Size([3])
-    cond = getMask(imgs_color, color, epsilon, grow_size)
-    imgs.permute(0, 2, 3, 1)[cond] = imgs_color.permute(0, 2, 3, 1)[cond]
-    return imgs
+    cond = getMask(imgs1, color, epsilon, grow_size)
+    (imgs2 if paste else imgs1).permute(0, 2, 3, 1)[cond] = (imgs1 if paste else imgs2).permute(0, 2, 3, 1)[cond]
+    return imgs1
 
 
 def maskColor(imgs, color, epsilon, grow_size=1):
@@ -178,9 +170,9 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
     if mode == 'mask':
         imgR = maskColor(img1, color, epsilon, grow_size)
     elif mode == 'replace':
-        imgR = replaceColor(img1, img2, color, epsilon, grow_size)
+        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size)
     elif mode == 'paste':
-        imgR = pasteColor(img1, img2, color, epsilon, grow_size)
+        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size, paste=True)
     elif mode == 'erase':
         imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
     else:
