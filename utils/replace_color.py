@@ -1,11 +1,10 @@
-import time
+import os
 
 import click
-import torch
-from PIL import Image
 import numpy as np
-import os
+import torch
 import torch.nn.functional as F
+from PIL import Image
 
 
 def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
