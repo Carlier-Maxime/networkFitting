@@ -117,6 +117,7 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
     assert color.shape == torch.Size([3])
     assert erase_size > 1
     cond = getMask(imgs, color, epsilon, grow_size)
+    if imgs.dtype == torch.uint8: imgs = imgs.to(torch.float)
     while cond.any():
         kernel = torch.ones(1, 1, erase_size, erase_size, device=cond.device)
         nbPixelsIgnored = F.conv2d(cond[:, None].to(torch.float), kernel, padding='same')[:, 0]
