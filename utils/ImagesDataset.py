@@ -1,8 +1,11 @@
+import cv2
+import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 from PIL import Image
 
-from utils.data_utils import make_dataset
+from data_utils import make_dataset
+from replace_color import rgb2hsv
 
 
 class ImagesDataset(Dataset):
@@ -28,3 +31,18 @@ class ImagesDataset(Dataset):
         tab_normalize = [0.5, 0.5, 0.5]
         if from_im.mode=="RGBA": tab_normalize += [0.5]
         return fname, transforms.Compose([transforms.ToTensor(), transforms.Normalize(tab_normalize, tab_normalize)])(from_im)
+
+
+class ImagesByVideoDataset(Dataset):
+    def __init__(self, video_path: str, mode: str = 'RGB', device='cuda'):
+        self.video_capture = cv2.VideoCapture(video_path)
+        self.mode = mode
+        self.device = device
+
+    def __len__(self):
+        return int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    def __getitem__(self, idx):
+        ret, frame = self.video_capture.read()
+        frame = torch.from_numpy(frame)[:, :, [2, 1, 0]].permute(2, 0, 1).to(self.device)
+        return frame if self.mode == 'RGB' else rgb2hsv(frame[None])[0]
