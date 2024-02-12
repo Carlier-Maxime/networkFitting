@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
+from torch.utils.data import DataLoader
 
 
 def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
@@ -69,13 +70,13 @@ def maskColor(imgs, color, epsilon, grow_size=1):
 
 def save_mask_stain(maskStains, min_light=32):
     color_interval = (256-min_light)
-    mask_color = ((maskStains / maskStains.max()) * (color_interval ** 3 - 1)).repeat(3, 1, 1)
+    mask_color = ((maskStains / maskStains.max()) * (color_interval ** 3 - 1)).repeat(3, 1, 1, 1)
     mask_color[0] = (mask_color[0] % color_interval) + min_light
     mask_color[1] = ((mask_color[1] / color_interval) % color_interval) + min_light
     mask_color[2] = ((mask_color[2] / color_interval) / color_interval) + min_light
     mask_color[mask_color == min_light] = 0
-    mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
-    Image.fromarray(mask_color).save(f'{global_outdir}/mask_stain.png')
+    mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 3, 0).cpu().numpy()
+    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{global_outdir}/mask_stain{i}.png')
 
 
 def getCentersOfStain(masks: torch.Tensor):
@@ -103,7 +104,8 @@ def getMask(imgs, color, epsilon, grow_size=1):
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
     if global_save_mask:
-        Image.fromarray((cond.to(torch.uint8) * 255)[0].cpu().numpy()).save(f"{global_outdir}/mask.png")
+        masks = (cond.to(torch.uint8) * 255).cpu().numpy()
+        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{global_outdir}/mask{i}.png")
     return cond
 
 
@@ -125,6 +127,24 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
         imgs.permute(0, 2, 3, 1)[cond] = (sumPixelsKernel.permute(0, 2, 3, 1)[cond].permute(1, 0) / div[cond]).permute(1, 0)
         cond = nextCond
     return imgs
+
+
+def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, out: str = "out", grow_size: int = 3, erase_size: int = 5, batch: int = 1, mode='RGB'):
+    from ImagesDataset import ImagesByVideoDataset
+    data = DataLoader(ImagesByVideoDataset(video_path, mode), batch_size=batch, shuffle=False)
+    global global_save_ccs, global_outdir, global_save_mask
+    global_save_ccs = False
+    global_outdir = out
+    global_save_mask = True
+    frame = 0
+    for imgs in data:
+        imgs_erased_color = eraseColor(imgs, color, epsilon, grow_size, erase_size)
+        if mode == 'HSV': imgs_erased_color = hsv2rgb(imgs_erased_color)
+        imgs_erased_color = imgs_erased_color.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
+        for img in imgs_erased_color:
+            Image.fromarray(img, 'RGB').save(f'{out}/frame{frame}.png')
+            frame += 1
+        break
 
 
 global_outdir = None
