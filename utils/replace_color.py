@@ -125,7 +125,7 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
         nbPixelsIgnored = F.conv2d(cond[:, None].to(torch.float), kernel, padding='same')[:, 0]
         sumPixelsKernel = F.conv2d(imgs * ~cond, kernel.repeat((imgs.shape[1], 1, 1, 1)), padding='same', groups=imgs.shape[1])
         div = max_div - nbPixelsIgnored
-        nextCond = div < 1
+        nextCond = div < erase_size >> 1
         cond = cond ^ nextCond
         imgs.permute(0, 2, 3, 1)[cond] = (sumPixelsKernel.permute(0, 2, 3, 1)[cond].permute(1, 0) / div[cond]).permute(1, 0)
         cond = nextCond
