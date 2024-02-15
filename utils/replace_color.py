@@ -136,17 +136,31 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
     return imgs
 
 
-def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, grow_size: int = 3, erase_size: int = 5, batch: int = 1, mode='RGB'):
+def process(mode, type_c, img1, img2, color, epsilon, grow_size, erase_size):
+    if mode == 'mask':
+        imgR = maskColor(img1, color, epsilon, grow_size)
+    elif mode == 'replace':
+        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size)
+    elif mode == 'paste':
+        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size, paste=True)
+    elif mode == 'erase':
+        imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
+    else:
+        raise ValueError('mode unknown : ' + mode)
+    return imgR if type_c == 'RGB' else hsv2rgb(imgR)
+
+
+def videoProcess(path1: str, path2, color: torch.Tensor, epsilon: torch.Tensor, grow_size: int = 3, erase_size: int = 5, batch: int = 1, type_c='RGB', mode='erase'):
     from ImagesDataset import ImagesByVideoDataset
-    data = DataLoader(ImagesByVideoDataset(video_path, mode), batch_size=batch, shuffle=False)
+    data = DataLoader(ImagesByVideoDataset(path1, type_c), batch_size=batch, shuffle=False)
+    data2 = data if path2 is None else DataLoader(ImagesByVideoDataset(path2, type_c), batch_size=batch, shuffle=False)
     global global_save_ccs, global_outdir, global_save_mask, current_index
     frame = 0
     current_index = 0
-    for imgs in data:
-        imgs_erased_color = eraseColor(imgs, color, epsilon, grow_size, erase_size)
-        if mode == 'HSV': imgs_erased_color = hsv2rgb(imgs_erased_color)
-        imgs_erased_color = imgs_erased_color.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
-        for img in imgs_erased_color:
+    for imgs1, imgs2 in zip(data, data2):
+        imgsR = process(mode, type_c, imgs1, imgs2, color, epsilon, grow_size, erase_size)
+        imgsR = imgsR.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
+        for img in imgsR:
             Image.fromarray(img, 'RGB').save(f'{global_outdir}/frame{frame}.png')
             frame += 1
         current_index = frame
@@ -164,17 +178,7 @@ def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type
     if type_c == 'HSV':
         img1 = rgb2hsv(img1)
         img2 = None if img2 is None else rgb2hsv(img2)
-    if mode == 'mask':
-        imgR = maskColor(img1, color, epsilon, grow_size)
-    elif mode == 'replace':
-        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size)
-    elif mode == 'paste':
-        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size, paste=True)
-    elif mode == 'erase':
-        imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
-    else:
-        raise ValueError('mode unknown : ' + mode)
-    if type_c == 'HSV': imgR = hsv2rgb(imgR)
+    imgR = process(mode, type_c, img1, img2, color, epsilon, grow_size, erase_size)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{global_outdir}/replaced.png')
 
@@ -210,7 +214,7 @@ def main(path1, path2, mode, device_name, epsilon, color, outdir, type_c, grow_s
         epsilon = torch.tensor(epsilon).to(device)
     type_c = type_c.upper()
     if path1.split(".")[-1].lower() not in ['png', 'jpg', 'jpeg']:
-        videoProcess(path1, color, epsilon, grow_size, erase_size, 1, type_c)
+        videoProcess(path1, path2, color, epsilon, grow_size, erase_size, 1, type_c, mode)
     else:
         imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type_c)
 
