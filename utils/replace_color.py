@@ -183,9 +183,10 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
         epsilon = epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
+    type_c = type_c.upper()
     img1 = loadImg(img1_path).to(device)[None]
     img2 = loadImg(img2_path).to(device)[None] if mode in ['replace', 'paste'] else None
-    if type_c == 'hsv':
+    if type_c == 'HSV':
         img1 = rgb2hsv(img1)
         img2 = None if img2 is None else rgb2hsv(img2)
     if mode == 'mask':
@@ -198,7 +199,7 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
         imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
     else:
         raise ValueError('mode unknown : ' + mode)
-    if type_c == 'hsv': imgR = hsv2rgb(imgR)
+    if type_c == 'HSV': imgR = hsv2rgb(imgR)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{outdir}/replaced.png')
 
