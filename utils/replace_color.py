@@ -147,7 +147,6 @@ def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, ou
         for img in imgs_erased_color:
             Image.fromarray(img, 'RGB').save(f'{out}/frame{frame}.png')
             frame += 1
-        break
 
 
 global_outdir = None
@@ -173,13 +172,8 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
     global_outdir = outdir
     global_save_ccs = save_ccs
     global_save_mask = save_mask
-    os.makedirs(outdir, exist_ok=True)
     device = torch.device(device_name)
-    img1 = loadImg(img1_path).to(device)[None]
-    img2 = loadImg(img2_path).to(device)[None] if mode in ['replace', 'paste'] else None
-    if type_c == 'hsv':
-        img1 = rgb2hsv(img1)
-        img2 = None if img2 is None else rgb2hsv(img2)
+    os.makedirs(outdir, exist_ok=True)
     color = color[1:-1].split(',')
     for i in range(len(color)): color[i] = float(color[i])
     color = torch.tensor(color).to(device)
@@ -189,6 +183,11 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
         epsilon = epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
+    img1 = loadImg(img1_path).to(device)[None]
+    img2 = loadImg(img2_path).to(device)[None] if mode in ['replace', 'paste'] else None
+    if type_c == 'hsv':
+        img1 = rgb2hsv(img1)
+        img2 = None if img2 is None else rgb2hsv(img2)
     if mode == 'mask':
         imgR = maskColor(img1, color, epsilon, grow_size)
     elif mode == 'replace':
