@@ -7,6 +7,10 @@ import torch.nn.functional as F
 from PIL import Image
 from torch.utils.data import DataLoader
 
+import sys
+sys.path.append(".")
+from stylegan_xl import dnnlib
+
 
 def rgb2hsv(color: torch.Tensor) -> torch.Tensor:
     color = color.to(torch.float) / 255
@@ -76,7 +80,7 @@ def save_mask_stain(maskStains, min_light=32):
     mask_color[2] = ((mask_color[2] / color_interval) / color_interval) + min_light
     mask_color[mask_color == min_light] = 0
     mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 3, 0).cpu().numpy()
-    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{global_outdir}/mask_stain{"" if current_index is None else current_index+i}.png')
+    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{opts.outdir}/mask_stain{"" if opts.current_index is None else opts.current_index+i}.png')
 
 
 def getCentersOfStain(masks: torch.Tensor):
@@ -85,7 +89,7 @@ def getCentersOfStain(masks: torch.Tensor):
     sames = masks[:, :-1] & masks[:, 1:]
     pairs = torch.stack((markers[:, :-1][sames], markers[:, 1:][sames]), dim=1).unique(dim=0)
     for k in range(len(pairs)): markers[markers == pairs[k, 0]] = pairs[k, 1]
-    if global_save_mask: save_mask_stain(markers)
+    if opts.save_mask: save_mask_stain(markers)
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
     where = torch.where(markers.eq(markers_id[..., None, None, None]))
@@ -98,18 +102,18 @@ def getCentersOfStain(masks: torch.Tensor):
 def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
     cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
-    if global_save_ccs:
+    if opts.save_ccs:
         centers = getCentersOfStain(cond)
         for i in range(len(centers)):
-            save_index = "" if current_index is None else current_index+i
+            save_index = "" if opts.current_index is None else opts.current_index+i
             print(f"Number of color stain detected in image {save_index} : {len(centers[i])}")
-            np.save(f"{global_outdir}/centers{save_index}.npy", centers[i].cpu().numpy())
+            np.save(f"{opts.outdir}/centers{save_index}.npy", centers[i].cpu().numpy())
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
-    if global_save_mask:
+    if opts.save_mask:
         masks = (cond.to(torch.uint8) * 255).cpu().numpy()
-        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{global_outdir}/mask{'' if current_index is None else current_index+i}.png")
+        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{opts.outdir}/mask{'' if opts.current_index is None else opts.current_index+i}.png")
     return cond
 
 
@@ -154,16 +158,15 @@ def videoProcess(path1: str, path2, color: torch.Tensor, epsilon: torch.Tensor, 
     from ImagesDataset import ImagesByVideoDataset
     data = DataLoader(ImagesByVideoDataset(path1, type_c), batch_size=batch, shuffle=False)
     data2 = data if path2 is None else DataLoader(ImagesByVideoDataset(path2, type_c), batch_size=batch, shuffle=False)
-    global global_save_ccs, global_outdir, global_save_mask, current_index
     frame = 0
-    current_index = 0
+    opts.current_index = 0
     for imgs1, imgs2 in zip(data, data2):
         imgsR = process(mode, type_c, imgs1, imgs2, color, epsilon, grow_size, erase_size)
         imgsR = imgsR.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
         for img in imgsR:
-            Image.fromarray(img, 'RGB').save(f'{global_outdir}/frame{frame}.png')
+            Image.fromarray(img, 'RGB').save(f'{opts.outdir}/frame{frame}.png')
             frame += 1
-        current_index = frame
+        opts.current_index = frame
 
 
 def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type_c):
@@ -174,20 +177,17 @@ def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type
         img2 = None if img2 is None else rgb2hsv(img2)
     imgR = process(mode, type_c, img1, img2, color, epsilon, grow_size, erase_size)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
-    Image.fromarray(imgR, 'RGB').save(f'{global_outdir}/replaced.png')
+    Image.fromarray(imgR, 'RGB').save(f'{opts.outdir}/replaced.png')
 
 
-global_outdir = None
-global_save_ccs = None
-global_save_mask = None
-current_index = None
+global opts
 
 
 @click.command()
 @click.option('--path1', type=str)
 @click.option('--path2', type=str)
 @click.option('--mode', help='mode used for change color', type=click.Choice(['mask', 'replace', 'paste', 'erase']), default='replace')
-@click.option('--device', 'device_name', default='cuda', type=torch.device)
+@click.option('--device', default='cuda', type=torch.device)
 @click.option('--epsilon', metavar='[color|float]')
 @click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str)
 @click.option('--outdir', default='out')
@@ -196,27 +196,26 @@ current_index = None
 @click.option('--erase_size', help='size of kernel used for calcul average of surrounding pixels', type=click.IntRange(min=2), default=5)
 @click.option('--save-ccs', help='Save a center of color stain to a numpy file', is_flag=True, default=False)
 @click.option('--save-mask', help='Save a mask to a PNG', is_flag=True, default=False)
-def main(path1, path2, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size, save_ccs, save_mask):
-    global global_outdir, global_save_ccs, global_save_mask
-    global_outdir = outdir+'/'+path1.split("/")[-1].split(".")[0]
-    global_save_ccs = save_ccs
-    global_save_mask = save_mask
-    device = torch.device(device_name)
+def main(**kwargs):
+    global opts
+    opts = dnnlib.EasyDict(kwargs)
+    global_outdir = opts.outdir+'/'+opts.path1.split("/")[-1].split(".")[0]
+    opts.device = torch.device(opts.device)
     os.makedirs(global_outdir, exist_ok=True)
-    color = color[1:-1].split(',')
-    for i in range(len(color)): color[i] = float(color[i])
-    color = torch.tensor(color).to(device)
+    opts.color = opts.color[1:-1].split(',')
+    for i in range(len(opts.color)): opts.color[i] = float(opts.color[i])
+    opts.color = torch.tensor(opts.color).to(opts.device)
     try:
-        epsilon = float(epsilon)
+        opts.epsilon = float(opts.epsilon)
     except ValueError:
-        epsilon = epsilon[1:-1].split(',')
-        for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
-        epsilon = torch.tensor(epsilon).to(device)
-    type_c = type_c.upper()
-    if path1.split(".")[-1].lower() not in ['png', 'jpg', 'jpeg']:
-        videoProcess(path1, path2, color, epsilon, grow_size, erase_size, 1, type_c, mode)
+        opts.epsilon = opts.epsilon[1:-1].split(',')
+        for i in range(len(opts.epsilon)): opts.epsilon[i] = float(opts.epsilon[i])
+        opts.epsilon = torch.tensor(opts.epsilon).to(opts.device)
+    opts.type_c = opts.type_c.upper()
+    if opts.path1.split(".")[-1].lower() not in ['png', 'jpg', 'jpeg']:
+        videoProcess(opts.path1, opts.path2, opts.color, opts.epsilon, opts.grow_size, opts.erase_size, 1, opts.type_c, opts.mode)
     else:
-        imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type_c)
+        imageProcess(opts.path1, opts.path2, opts.mode, opts.color, opts.epsilon, opts.grow_size, opts.erase_size, opts.type_c)
 
 
 if __name__ == '__main__':
