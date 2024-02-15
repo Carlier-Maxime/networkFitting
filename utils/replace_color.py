@@ -88,9 +88,11 @@ def getCentersOfStain(masks: torch.Tensor):
     if global_save_mask: save_mask_stain(markers)
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
-    where = torch.where(markers.eq(markers_id[..., None, None]))
-    markers = torch.stack([where[1], where[2]]).split(where[0].unique(return_counts=True)[1].tolist(), dim=1)
-    return torch.stack([marker.float().mean(axis=1) for marker in markers])
+    where = torch.where(markers.eq(markers_id[..., None, None, None]))
+    nb_pixels = where[0].unique(return_counts=True)[1]
+    markers = torch.stack([where[2], where[3]]).split(nb_pixels.tolist(), dim=1)
+    centers = torch.stack([marker.float().mean(axis=1) for marker in markers])
+    return centers.split(where[1][nb_pixels.cumsum(dim=0).sub(1)].unique(return_counts=True)[1].tolist())
 
 
 def getMask(imgs, color, epsilon, grow_size=1):
@@ -98,8 +100,9 @@ def getMask(imgs, color, epsilon, grow_size=1):
     cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
     if global_save_ccs:
         centers = getCentersOfStain(cond)
-        print(f"Number of color stain detected : {len(centers)}")
-        np.save(f"{global_outdir}/centers.npy", centers.cpu().numpy())
+        for i in range(len(centers)):
+            print(f"Number of color stain detected in image {i} : {len(centers[i])}")
+            np.save(f"{global_outdir}/centers{i}.npy", centers[i].cpu().numpy())
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
