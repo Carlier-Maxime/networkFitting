@@ -80,7 +80,7 @@ def save_mask_stain(maskStains, min_light=32):
     mask_color[2] = ((mask_color[2] / color_interval) / color_interval) + min_light
     mask_color[mask_color == min_light] = 0
     mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 3, 0).cpu().numpy()
-    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{opts.outdir}/mask_stain{"" if opts.current_index is None else opts.current_index+i}.png')
+    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{opts.outdir_mask_stained}/mask_stain{"" if opts.current_index is None else opts.current_index+i}.png')
 
 
 def getCentersOfStain(masks: torch.Tensor):
@@ -107,13 +107,13 @@ def getMask(imgs, color, epsilon, grow_size=1):
         for i in range(len(centers)):
             save_index = "" if opts.current_index is None else opts.current_index+i
             print(f"Number of color stain detected in image {save_index} : {len(centers[i])}")
-            np.save(f"{opts.outdir}/centers{save_index}.npy", centers[i].cpu().numpy())
+            np.save(f"{opts.outdir_ccs}/centers{save_index}.npy", centers[i].cpu().numpy())
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
     if opts.save_mask:
         masks = (cond.to(torch.uint8) * 255).cpu().numpy()
-        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{opts.outdir}/mask{'' if opts.current_index is None else opts.current_index+i}.png")
+        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{opts.outdir_mask}/mask{'' if opts.current_index is None else opts.current_index+i}.png")
     return cond
 
 
@@ -165,7 +165,7 @@ def videoProcess(path1: str, path2, color: torch.Tensor, epsilon: torch.Tensor, 
         imgsR = process(mode, type_c, imgs1, imgs2, color, epsilon, grow_size, erase_size)
         imgsR = imgsR.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
         for img in imgsR:
-            Image.fromarray(img, 'RGB').save(f'{opts.outdir}/frame{frame}.png')
+            Image.fromarray(img, 'RGB').save(f'{opts.outdir_result}/frame{frame}.png')
             frame += 1
         opts.current_index = frame
 
@@ -206,9 +206,13 @@ global opts
 def main(**kwargs):
     global opts
     opts = dnnlib.EasyDict(kwargs)
-    global_outdir = opts.outdir+'/'+opts.path1.split("/")[-1].split(".")[0]
+    opts.outdir = opts.outdir+'/'+opts.path1.split("/")[-1].split(".")[0]
+    opts.outdir_ccs = opts.outdir+'/ccs'
+    opts.outdir_mask = opts.outdir+'/mask'
+    opts.outdir_mask_stained = opts.outdir+'/mask_stained'
+    opts.outdir_result = opts.outdir+'/result'
     opts.device = torch.device(opts.device)
-    os.makedirs(global_outdir, exist_ok=True)
+    for directory in [opts.outdir, opts.outdir_mask, opts.outdir_mask_stained, opts.outdir_ccs, opts.outdir_result]: os.makedirs(directory, exist_ok=True)
     opts.color = opts.color.to(opts.device)
     try:
         opts.epsilon = float(opts.epsilon)
