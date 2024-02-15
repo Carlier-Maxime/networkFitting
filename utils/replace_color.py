@@ -181,6 +181,12 @@ def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type
     Image.fromarray(imgR, 'RGB').save(f'{opts.outdir}/replaced.png')
 
 
+def str2tensor(_ctx, _param, value):
+    value = value[1:-1].split(',')
+    for i in range(len(value)): value[i] = float(value[i])
+    return torch.tensor(value)
+
+
 global opts
 
 
@@ -190,7 +196,7 @@ global opts
 @click.option('--mode', help='mode used for change color', type=click.Choice(['mask', 'replace', 'paste', 'erase']), default='replace')
 @click.option('--device', default='cuda', type=torch.device)
 @click.option('--epsilon', metavar='[color|float]')
-@click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str)
+@click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str, callback=str2tensor)
 @click.option('--outdir', default='out')
 @click.option('--type', 'type_c', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
 @click.option('--grow', 'grow_size', help='dilating a zone of specific color for prevent outline mistake', type=click.IntRange(min=1), default=1)
@@ -203,9 +209,7 @@ def main(**kwargs):
     global_outdir = opts.outdir+'/'+opts.path1.split("/")[-1].split(".")[0]
     opts.device = torch.device(opts.device)
     os.makedirs(global_outdir, exist_ok=True)
-    opts.color = opts.color[1:-1].split(',')
-    for i in range(len(opts.color)): opts.color[i] = float(opts.color[i])
-    opts.color = torch.tensor(opts.color).to(opts.device)
+    opts.color = opts.color.to(opts.device)
     try:
         opts.epsilon = float(opts.epsilon)
     except ValueError:
