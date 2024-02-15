@@ -166,12 +166,6 @@ def videoProcess(path1: str, path2, color: torch.Tensor, epsilon: torch.Tensor, 
         current_index = frame
 
 
-global_outdir = None
-global_save_ccs = None
-global_save_mask = None
-current_index = None
-
-
 def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type_c):
     img1 = loadImg(path1).to(color.device)[None]
     img2 = loadImg(path2).to(color.device)[None] if mode in ['replace', 'paste'] else None
@@ -181,6 +175,12 @@ def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type
     imgR = process(mode, type_c, img1, img2, color, epsilon, grow_size, erase_size)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
     Image.fromarray(imgR, 'RGB').save(f'{global_outdir}/replaced.png')
+
+
+global_outdir = None
+global_save_ccs = None
+global_save_mask = None
+current_index = None
 
 
 @click.command()
