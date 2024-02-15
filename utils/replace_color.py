@@ -209,7 +209,7 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
         raise ValueError('mode unknown : ' + mode)
     if type_c == 'HSV': imgR = hsv2rgb(imgR)
     imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
-    Image.fromarray(imgR, 'RGB').save(f'{outdir}/replaced.png')
+    Image.fromarray(imgR, 'RGB').save(f'{global_outdir}/replaced.png')
 
 
 if __name__ == '__main__':
