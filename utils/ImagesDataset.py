@@ -44,5 +44,6 @@ class ImagesByVideoDataset(Dataset):
 
     def __getitem__(self, idx):
         ret, frame = self.video_capture.read()
+        if frame is None: return torch.tensor([], device=self.device)
         frame = torch.from_numpy(frame)[:, :, [2, 1, 0]].permute(2, 0, 1).to(self.device)
         return frame if self.mode == 'RGB' else rgb2hsv(frame[None])[0]

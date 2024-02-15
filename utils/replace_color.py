@@ -161,6 +161,7 @@ def videoProcess(path1: str, path2, color: torch.Tensor, epsilon: torch.Tensor, 
     frame = 0
     opts.current_index = 0
     for imgs1, imgs2 in zip(data, data2):
+        if not imgs1.numel() or not imgs2.numel(): continue
         imgsR = process(mode, type_c, imgs1, imgs2, color, epsilon, grow_size, erase_size)
         imgsR = imgsR.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
         for img in imgsR:
