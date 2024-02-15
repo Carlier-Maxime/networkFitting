@@ -203,7 +203,7 @@ global opts
 @click.option('--mode', help='mode used for change color', type=click.Choice(['mask', 'replace', 'paste', 'erase']), default='replace')
 @click.option('--device', default='cuda', type=torch.device)
 @click.option('--epsilon', metavar='[color|float]', callback=str2floatOrTensor)
-@click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str, callback=str2tensor)
+@click.option('--color', help='a color list, value of component in float range [0.,255.]', metavar='color', type=str, callback=str2tensor)
 @click.option('--outdir', default='out')
 @click.option('--type', 'type_c', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
 @click.option('--grow', 'grow_size', help='dilating a zone of specific color for prevent outline mistake', type=click.IntRange(min=1), default=1)
