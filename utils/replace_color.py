@@ -136,13 +136,10 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
     return imgs
 
 
-def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, out: str = "out", grow_size: int = 3, erase_size: int = 5, batch: int = 1, mode='RGB'):
+def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, grow_size: int = 3, erase_size: int = 5, batch: int = 1, mode='RGB'):
     from ImagesDataset import ImagesByVideoDataset
     data = DataLoader(ImagesByVideoDataset(video_path, mode), batch_size=batch, shuffle=False)
     global global_save_ccs, global_outdir, global_save_mask, current_index
-    global_save_ccs = False
-    global_outdir = out
-    global_save_mask = True
     frame = 0
     current_index = 0
     for imgs in data:
@@ -150,7 +147,7 @@ def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, ou
         if mode == 'HSV': imgs_erased_color = hsv2rgb(imgs_erased_color)
         imgs_erased_color = imgs_erased_color.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
         for img in imgs_erased_color:
-            Image.fromarray(img, 'RGB').save(f'{out}/frame{frame}.png')
+            Image.fromarray(img, 'RGB').save(f'{global_outdir}/frame{frame}.png')
             frame += 1
         current_index = frame
 
@@ -162,8 +159,8 @@ current_index = None
 
 
 @click.command()
-@click.option('--img1', 'img1_path', type=str)
-@click.option('--img2', 'img2_path', type=str)
+@click.option('--path1', type=str)
+@click.option('--path2', type=str)
 @click.option('--mode', help='mode used for change color', type=click.Choice(['mask', 'replace', 'paste', 'erase']), default='replace')
 @click.option('--device', 'device_name', default='cuda', type=torch.device)
 @click.option('--epsilon', metavar='[color|float]')
@@ -174,9 +171,9 @@ current_index = None
 @click.option('--erase_size', help='size of kernel used for calcul average of surrounding pixels', type=click.IntRange(min=2), default=5)
 @click.option('--save-ccs', help='Save a center of color stain to a numpy file', is_flag=True, default=False)
 @click.option('--save-mask', help='Save a mask to a PNG', is_flag=True, default=False)
-def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size, save_ccs, save_mask):
+def main(path1, path2, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size, save_ccs, save_mask):
     global global_outdir, global_save_ccs, global_save_mask
-    global_outdir = outdir+'/'+img1_path.split("/")[-1].split(".")[0]
+    global_outdir = outdir+'/'+path1.split("/")[-1].split(".")[0]
     global_save_ccs = save_ccs
     global_save_mask = save_mask
     device = torch.device(device_name)
@@ -191,9 +188,11 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
     type_c = type_c.upper()
-    # videoProcess(img1_path, color, epsilon, outdir, grow_size, erase_size, 1, type_c)
-    img1 = loadImg(img1_path).to(device)[None]
-    img2 = loadImg(img2_path).to(device)[None] if mode in ['replace', 'paste'] else None
+    if path1.split(".")[-1].lower() not in ['png', 'jpg', 'jpeg']:
+        videoProcess(path1, color, epsilon, grow_size, erase_size, 1, type_c)
+        exit()
+    img1 = loadImg(path1).to(device)[None]
+    img2 = loadImg(path2).to(device)[None] if mode in ['replace', 'paste'] else None
     if type_c == 'HSV':
         img1 = rgb2hsv(img1)
         img2 = None if img2 is None else rgb2hsv(img2)
