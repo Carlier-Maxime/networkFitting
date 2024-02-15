@@ -88,7 +88,9 @@ def getCentersOfStain(masks: torch.Tensor):
     markers[masks] = torch.nn.ConstantPad2d((1, 1, 0, 0), False)(masks).unique_consecutive(return_inverse=True)[1][:, :, 1:-1][masks]
     sames = masks[:, :-1] & masks[:, 1:]
     pairs = torch.stack((markers[:, :-1][sames], markers[:, 1:][sames]), dim=1).unique(dim=0)
-    for k in range(len(pairs)): markers[markers == pairs[k, 0]] = pairs[k, 1]
+    for k in range(len(pairs)):
+        markers[markers == pairs[k, 0]] = pairs[k, 1]
+        pairs[k+1:][pairs[k+1:].eq(pairs[k, 0])] = pairs[k, 1]
     if opts.save_mask: save_mask_stain(markers)
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
