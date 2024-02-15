@@ -187,6 +187,13 @@ def str2tensor(_ctx, _param, value):
     return torch.tensor(value)
 
 
+def str2floatOrTensor(_ctx, _param, value):
+    try:
+        return float(value)
+    except ValueError:
+        return str2tensor(_ctx, _param, value)
+
+
 global opts
 
 
@@ -195,7 +202,7 @@ global opts
 @click.option('--path2', type=str)
 @click.option('--mode', help='mode used for change color', type=click.Choice(['mask', 'replace', 'paste', 'erase']), default='replace')
 @click.option('--device', default='cuda', type=torch.device)
-@click.option('--epsilon', metavar='[color|float]')
+@click.option('--epsilon', metavar='[color|float]', callback=str2floatOrTensor)
 @click.option('--color', help='a color list, value of composante in float range [0.,255.]', metavar='color', type=str, callback=str2tensor)
 @click.option('--outdir', default='out')
 @click.option('--type', 'type_c', help='a type of color data', type=click.Choice(['rgb', 'hsv']), default='rgb')
@@ -214,12 +221,7 @@ def main(**kwargs):
     opts.device = torch.device(opts.device)
     for directory in [opts.outdir, opts.outdir_mask, opts.outdir_mask_stained, opts.outdir_ccs, opts.outdir_result]: os.makedirs(directory, exist_ok=True)
     opts.color = opts.color.to(opts.device)
-    try:
-        opts.epsilon = float(opts.epsilon)
-    except ValueError:
-        opts.epsilon = opts.epsilon[1:-1].split(',')
-        for i in range(len(opts.epsilon)): opts.epsilon[i] = float(opts.epsilon[i])
-        opts.epsilon = torch.tensor(opts.epsilon).to(opts.device)
+    opts.epsilon = opts.epsilon.to(opts.device)
     opts.type_c = opts.type_c.upper()
     if opts.path1.split(".")[-1].lower() not in ['png', 'jpg', 'jpeg']:
         videoProcess(opts.path1, opts.path2, opts.color, opts.epsilon, opts.grow_size, opts.erase_size, 1, opts.type_c, opts.mode)
