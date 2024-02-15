@@ -158,6 +158,27 @@ global_save_mask = None
 current_index = None
 
 
+def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type_c):
+    img1 = loadImg(path1).to(color.device)[None]
+    img2 = loadImg(path2).to(color.device)[None] if mode in ['replace', 'paste'] else None
+    if type_c == 'HSV':
+        img1 = rgb2hsv(img1)
+        img2 = None if img2 is None else rgb2hsv(img2)
+    if mode == 'mask':
+        imgR = maskColor(img1, color, epsilon, grow_size)
+    elif mode == 'replace':
+        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size)
+    elif mode == 'paste':
+        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size, paste=True)
+    elif mode == 'erase':
+        imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
+    else:
+        raise ValueError('mode unknown : ' + mode)
+    if type_c == 'HSV': imgR = hsv2rgb(imgR)
+    imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
+    Image.fromarray(imgR, 'RGB').save(f'{global_outdir}/replaced.png')
+
+
 @click.command()
 @click.option('--path1', type=str)
 @click.option('--path2', type=str)
@@ -190,25 +211,8 @@ def main(path1, path2, mode, device_name, epsilon, color, outdir, type_c, grow_s
     type_c = type_c.upper()
     if path1.split(".")[-1].lower() not in ['png', 'jpg', 'jpeg']:
         videoProcess(path1, color, epsilon, grow_size, erase_size, 1, type_c)
-        exit()
-    img1 = loadImg(path1).to(device)[None]
-    img2 = loadImg(path2).to(device)[None] if mode in ['replace', 'paste'] else None
-    if type_c == 'HSV':
-        img1 = rgb2hsv(img1)
-        img2 = None if img2 is None else rgb2hsv(img2)
-    if mode == 'mask':
-        imgR = maskColor(img1, color, epsilon, grow_size)
-    elif mode == 'replace':
-        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size)
-    elif mode == 'paste':
-        imgR = replaceOrPasteColor(img1, img2, color, epsilon, grow_size, paste=True)
-    elif mode == 'erase':
-        imgR = eraseColor(img1, color, epsilon, grow_size, erase_size)
     else:
-        raise ValueError('mode unknown : ' + mode)
-    if type_c == 'HSV': imgR = hsv2rgb(imgR)
-    imgR = imgR.permute(0, 2, 3, 1).to(torch.uint8)[0].cpu().numpy()
-    Image.fromarray(imgR, 'RGB').save(f'{global_outdir}/replaced.png')
+        imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type_c)
 
 
 if __name__ == '__main__':
