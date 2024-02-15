@@ -76,7 +76,7 @@ def save_mask_stain(maskStains, min_light=32):
     mask_color[2] = ((mask_color[2] / color_interval) / color_interval) + min_light
     mask_color[mask_color == min_light] = 0
     mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 3, 0).cpu().numpy()
-    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{global_outdir}/mask_stain{i}.png')
+    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{global_outdir}/mask_stain{"" if current_index is None else current_index+i}.png')
 
 
 def getCentersOfStain(masks: torch.Tensor):
