@@ -101,14 +101,15 @@ def getMask(imgs, color, epsilon, grow_size=1):
     if global_save_ccs:
         centers = getCentersOfStain(cond)
         for i in range(len(centers)):
-            print(f"Number of color stain detected in image {i} : {len(centers[i])}")
-            np.save(f"{global_outdir}/centers{i}.npy", centers[i].cpu().numpy())
+            save_index = "" if current_index is None else current_index+i
+            print(f"Number of color stain detected in image {save_index} : {len(centers[i])}")
+            np.save(f"{global_outdir}/centers{save_index}.npy", centers[i].cpu().numpy())
     if grow_size > 1:
         kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
         cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
     if global_save_mask:
         masks = (cond.to(torch.uint8) * 255).cpu().numpy()
-        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{global_outdir}/mask{i}.png")
+        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{global_outdir}/mask{'' if current_index is None else current_index+i}.png")
     return cond
 
 
@@ -138,11 +139,12 @@ def eraseColor(imgs, color, epsilon, grow_size=1, erase_size=5):
 def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, out: str = "out", grow_size: int = 3, erase_size: int = 5, batch: int = 1, mode='RGB'):
     from ImagesDataset import ImagesByVideoDataset
     data = DataLoader(ImagesByVideoDataset(video_path, mode), batch_size=batch, shuffle=False)
-    global global_save_ccs, global_outdir, global_save_mask
+    global global_save_ccs, global_outdir, global_save_mask, current_index
     global_save_ccs = False
     global_outdir = out
     global_save_mask = True
     frame = 0
+    current_index = 0
     for imgs in data:
         imgs_erased_color = eraseColor(imgs, color, epsilon, grow_size, erase_size)
         if mode == 'HSV': imgs_erased_color = hsv2rgb(imgs_erased_color)
@@ -150,11 +152,13 @@ def videoProcess(video_path: str, color: torch.Tensor, epsilon: torch.Tensor, ou
         for img in imgs_erased_color:
             Image.fromarray(img, 'RGB').save(f'{out}/frame{frame}.png')
             frame += 1
+        current_index = frame
 
 
 global_outdir = None
 global_save_ccs = None
 global_save_mask = None
+current_index = None
 
 
 @click.command()
@@ -187,6 +191,7 @@ def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
     type_c = type_c.upper()
+    # videoProcess(img1_path, color, epsilon, outdir, grow_size, erase_size, 1, type_c)
     img1 = loadImg(img1_path).to(device)[None]
     img2 = loadImg(img2_path).to(device)[None] if mode in ['replace', 'paste'] else None
     if type_c == 'HSV':
