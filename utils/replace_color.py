@@ -176,11 +176,11 @@ current_index = None
 @click.option('--save-mask', help='Save a mask to a PNG', is_flag=True, default=False)
 def main(img1_path, img2_path, mode, device_name, epsilon, color, outdir, type_c, grow_size, erase_size, save_ccs, save_mask):
     global global_outdir, global_save_ccs, global_save_mask
-    global_outdir = outdir
+    global_outdir = outdir+'/'+img1_path.split("/")[-1].split(".")[0]
     global_save_ccs = save_ccs
     global_save_mask = save_mask
     device = torch.device(device_name)
-    os.makedirs(outdir, exist_ok=True)
+    os.makedirs(global_outdir, exist_ok=True)
     color = color[1:-1].split(',')
     for i in range(len(color)): color[i] = float(color[i])
     color = torch.tensor(color).to(device)
