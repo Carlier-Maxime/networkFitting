@@ -225,6 +225,7 @@ def main(**kwargs):
     opts.color = opts.color.to(opts.device)
     opts.epsilon = opts.epsilon.to(opts.device)
     opts.type_c = opts.type_c.upper()
+    opts.current_index = 0
     if opts.path1.split(".")[-1].lower() not in ['png', 'jpg', 'jpeg']:
         videoProcess(opts.path1, opts.path2, opts.color, opts.epsilon, opts.grow_size, opts.erase_size, 1, opts.type_c, opts.mode)
     else:
