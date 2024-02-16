@@ -1,6 +1,7 @@
 import os
 
 import click
+import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -165,14 +166,17 @@ def videoProcess(path1: str, path2, color: torch.Tensor, epsilon: torch.Tensor, 
     data2 = data if path2 is None else DataLoader(ImagesByVideoDataset(path2, type_c), batch_size=batch, shuffle=False)
     frame = 0
     opts.current_index = 0
+    vid = cv2.VideoWriter(f'{opts.outdir}/result.avi', cv2.VideoWriter_fourcc(*'FFV1'), data.dataset.getFps(), data.dataset.getsize()) if opts.save_video else None
     for imgs1, imgs2 in zip(data, data2):
         if not imgs1.numel() or not imgs2.numel(): continue
         imgsR = process(mode, type_c, imgs1, imgs2, color, epsilon, grow_size, erase_size)
         imgsR = imgsR.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
         for img in imgsR:
             Image.fromarray(img, 'RGB').save(f'{opts.outdir_result}/frame{frame}.png')
+            if opts.save_video: vid.write(img[:, :, [2, 1, 0]])
             frame += 1
         opts.current_index = frame
+    if opts.save_video: vid.release()
 
 
 def imageProcess(path1, path2, mode, color, epsilon, grow_size, erase_size, type_c):
@@ -216,6 +220,7 @@ global opts
 @click.option('--save-ccs', help='Save a center of color stain to a numpy file', is_flag=True, default=False)
 @click.option('--save-mask', help='Save a mask to a PNG', is_flag=True, default=False)
 @click.option('--use-grow', help='use mask grown for detect center of color stain', is_flag=True, default=False)
+@click.option('--save-video', help='Save a result into video. (work only when input is a video)', is_flag=True, default=False)
 def main(**kwargs):
     global opts
     opts = dnnlib.EasyDict(kwargs)
