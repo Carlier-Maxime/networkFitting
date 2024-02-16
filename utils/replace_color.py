@@ -104,15 +104,18 @@ def getCentersOfStain(masks: torch.Tensor):
 def getMask(imgs, color, epsilon, grow_size=1):
     imgs = imgs.permute(0, 2, 3, 1)
     cond = ((imgs >= (color - epsilon)) & (imgs <= (color + epsilon))).all(axis=3)
+    if grow_size > 1:
+        kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
+        cond_grow = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
+    else:
+        cond_grow = cond
     if opts.save_ccs:
-        centers = getCentersOfStain(cond)
+        centers = getCentersOfStain(cond_grow if opts.use_grow else cond)
         for i in range(len(centers)):
             save_index = "" if opts.current_index is None else opts.current_index+i
             print(f"Number of color stain detected in image {save_index} : {len(centers[i])}")
             np.save(f"{opts.outdir_ccs}/centers{save_index}.npy", centers[i].cpu().numpy())
-    if grow_size > 1:
-        kernel = torch.ones(cond.shape[0], 1, grow_size, grow_size, device=cond.device)
-        cond = torch.gt(F.conv2d(cond[:, None].to(torch.float), kernel, padding='same'), 0)[:, 0]
+    cond = cond_grow
     if opts.save_mask:
         masks = (cond.to(torch.uint8) * 255).cpu().numpy()
         for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{opts.outdir_mask}/mask{'' if opts.current_index is None else opts.current_index+i}.png")
@@ -212,6 +215,7 @@ global opts
 @click.option('--erase_size', help='size of kernel used for calcul average of surrounding pixels', type=click.IntRange(min=2), default=5)
 @click.option('--save-ccs', help='Save a center of color stain to a numpy file', is_flag=True, default=False)
 @click.option('--save-mask', help='Save a mask to a PNG', is_flag=True, default=False)
+@click.option('--use-grow', help='use mask grown for detect center of color stain', is_flag=True, default=False)
 def main(**kwargs):
     global opts
     opts = dnnlib.EasyDict(kwargs)
