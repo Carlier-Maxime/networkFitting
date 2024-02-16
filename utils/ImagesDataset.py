@@ -42,6 +42,12 @@ class ImagesByVideoDataset(Dataset):
     def __len__(self):
         return int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
+    def getsize(self):
+        return int(self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    def getFps(self):
+        return self.video_capture.get(cv2.CAP_PROP_FPS)
+
     def __getitem__(self, idx):
         ret, frame = self.video_capture.read()
         if frame is None: return torch.tensor([], device=self.device)
