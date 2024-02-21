@@ -1,5 +1,9 @@
 import os
+import shutil
+from typing import List
+
 import cv2
+import numpy as np
 from PIL import Image
 from tqdm import trange
 
@@ -12,11 +16,14 @@ VIDEO_EXTENSIONS = [
     '.mkv', '.mp4'
 ]
 
+
 def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
+
 def is_video_file(filename):
     return any(filename.endswith(extension) for extension in VIDEO_EXTENSIONS)
+
 
 def tensor2im(var):
     # var shape: (3, H, W)
@@ -26,6 +33,7 @@ def tensor2im(var):
     var[var > 1] = 1
     var = var * 255
     return Image.fromarray(var.astype('uint8'))
+
 
 def make_dataset_by_dir(dir):
     images = []
@@ -38,36 +46,60 @@ def make_dataset_by_dir(dir):
                 images.append((fname, path))
     return images
 
-def make_dataset_by_video(video_path:str, ips:int, verbose:bool=True):
-    video=cv2.VideoCapture(video_path)
-    steps=(video.get(cv2.CAP_PROP_FRAME_COUNT)/video.get(cv2.CAP_PROP_FPS))*ips
-    frame_step = int(video.get(cv2.CAP_PROP_FPS)/ips)
-    if frame_step==0:
-        frame_step=1
+
+def make_dataset_by_video(video_path: str, ips: int, verbose: bool = True):
+    video = cv2.VideoCapture(video_path)
+    steps = (video.get(cv2.CAP_PROP_FRAME_COUNT) / video.get(cv2.CAP_PROP_FPS)) * ips
+    frame_step = int(video.get(cv2.CAP_PROP_FPS) / ips)
+    if frame_step == 0:
+        frame_step = 1
     images = []
-    read_counter=0
+    read_counter = 0
     vname = video_path.split("/")[-1].split(".")[0]
     vdir = f"data/{vname}_imgs"
-    os.makedirs(vdir,exist_ok=True)
-    for i in trange(1,int(steps+1), desc='Make dataset', unit='image', disable=(not verbose)):
+    os.makedirs(vdir, exist_ok=True)
+    for i in trange(1, int(steps + 1), desc='Make dataset', unit='image', disable=(not verbose)):
         target_pil = None
-        ret,cv2_im = video.read()
-        while (read_counter % frame_step != 0):
-            ret,cv2_im = video.read()
+        ret, cv2_im = video.read()
+        while read_counter % frame_step != 0:
+            ret, cv2_im = video.read()
             if not ret: break
-            read_counter+=1
+            read_counter += 1
         if not ret: break
-        read_counter+=1
-        converted = cv2.cvtColor(cv2_im,cv2.COLOR_BGR2RGB)
-        img_name = f"frame_{read_counter-1}"
+        read_counter += 1
+        converted = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+        img_name = f"frame_{read_counter - 1}"
         img_path = f"{vdir}/{img_name}.png"
         Image.fromarray(converted).save(img_path)
         images.append([img_name, img_path])
     return images
 
-def make_dataset(path, ips:int=60, verbose:bool=True):
+
+def make_dataset(path, ips: int = 60, verbose: bool = True):
     assert os.path.isdir(path) or is_video_file(path) or is_image_file(path), '%s is not a valid directory or video or image' % path
-    if os.path.isdir(path): return make_dataset_by_dir(path)
-    elif is_video_file(path): return make_dataset_by_video(path,ips,verbose)
-    elif is_image_file(path): return [[path.split('/')[-1].split('.')[0],path]]
+    if os.path.isdir(path):
+        return make_dataset_by_dir(path)
+    elif is_video_file(path):
+        return make_dataset_by_video(path, ips, verbose)
+    elif is_image_file(path):
+        return [[path.split('/')[-1].split('.')[0], path]]
     return []
+
+
+def transfer_data(paths: List[str], outdir: str, nbStains: int = 6):
+    i = 0
+    out_path_ccs = os.path.join(outdir, 'ccs')
+    out_path_target = os.path.join(outdir, 'target')
+    for out in [outdir, out_path_ccs, out_path_target]: os.makedirs(out, exist_ok=True)
+    for path in paths:
+        path_ccs = os.path.join(path, 'ccs')
+        path_result = os.path.join(path, 'result')
+        for root, _, fnames in os.walk(path_ccs):
+            for fname in fnames:
+                ccs_path = os.path.join(root, fname)
+                centers = np.load(ccs_path)
+                if centers.shape[0] == nbStains:
+                    shutil.copyfile(ccs_path, os.path.join(out_path_ccs, f'ccs{i}.npy'))
+                    shutil.copyfile(os.path.join(path_result, f'frame{int(fname.split(".")[0].split("centers")[-1])}.png'), os.path.join(out_path_target, f'img{i}.png'))
+                    i += 1
+    print(i)

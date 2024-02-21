@@ -1,3 +1,4 @@
+import itertools
 import os
 
 import click
@@ -163,12 +164,12 @@ def process(mode, type_c, img1, img2, color, epsilon, grow_size, erase_size):
 def videoProcess(path1: str, path2, color: torch.Tensor, epsilon: torch.Tensor, grow_size: int = 3, erase_size: int = 5, batch: int = 1, type_c='RGB', mode='erase'):
     from ImagesDataset import ImagesByVideoDataset
     data = DataLoader(ImagesByVideoDataset(path1, type_c), batch_size=batch, shuffle=False)
-    data2 = data if path2 is None else DataLoader(ImagesByVideoDataset(path2, type_c), batch_size=batch, shuffle=False)
+    data2 = [None] * len(data) if path2 is None else DataLoader(ImagesByVideoDataset(path2, type_c), batch_size=batch, shuffle=False)
     frame = 0
     opts.current_index = 0
     vid = cv2.VideoWriter(f'{opts.outdir}/result.avi', cv2.VideoWriter_fourcc(*'FFV1'), data.dataset.getFps(), data.dataset.getsize()) if opts.save_video else None
     for imgs1, imgs2 in zip(data, data2):
-        if not imgs1.numel() or not imgs2.numel(): continue
+        if not imgs1.numel() or (imgs2 is not None and not imgs2.numel()): continue
         imgsR = process(mode, type_c, imgs1, imgs2, color, epsilon, grow_size, erase_size)
         imgsR = imgsR.permute(0, 2, 3, 1).to(torch.uint8).cpu().numpy()
         for img in imgsR:
