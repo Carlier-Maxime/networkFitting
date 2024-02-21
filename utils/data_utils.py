@@ -96,10 +96,9 @@ def transfer_data(paths: List[str], outdir: str, nbStains: int = 6):
         path_result = os.path.join(path, 'result')
         for root, _, fnames in os.walk(path_ccs):
             for fname in fnames:
-                ccs_path = os.path.join(root, fname)
-                centers = np.load(ccs_path)
+                centers = np.load(os.path.join(root, fname))
                 if centers.shape[0] == nbStains:
-                    shutil.copyfile(ccs_path, os.path.join(out_path_ccs, f'ccs{i}.npy'))
-                    shutil.copyfile(os.path.join(path_result, f'frame{int(fname.split(".")[0].split("centers")[-1])}.png'), os.path.join(out_path_target, f'img{i}.png'))
+                    img = np.array(Image.open(os.path.join(path_result, f'frame{int(fname.split(".")[0].split("centers")[-1])}.png')).convert('RGB')).transpose((2, 0, 1))
+                    np.savez(os.path.join(outdir, f'data{i}.npz'), lmks=img, features=centers)
                     i += 1
     print(i)
