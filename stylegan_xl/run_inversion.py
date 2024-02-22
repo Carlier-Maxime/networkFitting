@@ -17,7 +17,8 @@ import dnnlib
 import legacy
 from metrics import metric_utils
 import timm
-from utils.replace_color import pasteColor
+from utils.replace_color import replaceOrPasteColor
+
 
 def get_morphed_w_code(new_w_code, fixed_w, regularizer_alpha=30):
     interpolation_direction = new_w_code - fixed_w
@@ -28,15 +29,14 @@ def get_morphed_w_code(new_w_code, fixed_w, regularizer_alpha=30):
 
 
 def space_regularizer_loss(
-    G_pti,
-    G_original,
-    w_batch,
-    vgg16,
-    num_of_sampled_latents=1,
-    lpips_lambda=10,
-    disable_gradient:bool=False
+        G_pti,
+        G_original,
+        w_batch,
+        vgg16,
+        num_of_sampled_latents=1,
+        lpips_lambda=10,
+        disable_gradient: bool = False
 ):
-
     z_samples = np.random.randn(num_of_sampled_latents, G_original.z_dim)
     z_samples = torch.from_numpy(z_samples).to(w_batch.device)
 
@@ -68,14 +68,14 @@ def space_regularizer_loss(
 
 
 def pivotal_tuning(
-    G,
-    w_pivot,
-    target,
-    device: torch.device,
-    num_steps=350,
-    learning_rate = 3e-4,
-    noise_mode="const",
-    verbose = False,
+        G,
+        w_pivot,
+        target,
+        device: torch.device,
+        num_steps=350,
+        learning_rate=3e-4,
+        noise_mode="const",
+        verbose=False,
 ):
     G_original = copy.deepcopy(G).eval().requires_grad_(False).to(device)
     G_pti = copy.deepcopy(G).train().requires_grad_(True).to(device)
@@ -101,10 +101,10 @@ def pivotal_tuning(
     all_images = []
     for step in range(num_steps):
         # Synth images from opt_w.
-        synth_images = G_pti.synthesis(w_pivot[0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
+        synth_images = G_pti.synthesis(w_pivot[0].repeat(1, G.num_ws, 1), noise_mode=noise_mode)
 
         # track images
-        synth_images = (synth_images + 1) * (255/2)
+        synth_images = (synth_images + 1) * (255 / 2)
         synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
         all_images.append(synth_images_np)
 
@@ -128,7 +128,7 @@ def pivotal_tuning(
         loss.backward()
         optimizer.step()
 
-        msg  = f'[ step {step+1:>4d}/{num_steps}] '
+        msg = f'[ step {step + 1:>4d}/{num_steps}] '
         msg += f'[ loss: {float(loss):<5.2f}] '
         msg += f'[ lpips: {float(lpips_loss):<5.2f}] '
         msg += f'[ mse: {float(mse_loss):<5.2f}]'
@@ -139,29 +139,29 @@ def pivotal_tuning(
 
 
 def project(
-    G,
-    target: torch.Tensor, # [C,H,W] and dynamic range [-1,1], W & H must match G output resolution
-    *,
-    num_steps = 1000,
-    w_avg_samples = 10000,
-    initial_learning_rate = 0.1,
-    lr_rampdown_length = 0.25,
-    lr_rampup_length = 0.05,
-    verbose = False,
-    device: torch.device,
-    noise_mode="const",
-    w_start_pivot=None,
-    seed:int=64,
-    save_img_step:bool=False,
-    paste_color:bool=False,
-    color:torch.Tensor=torch.tensor([-1.,1.,-1.]),
-    epsilon=1.0,
-    pbar=None
+        G,
+        target: torch.Tensor,  # [C,H,W] and dynamic range [-1,1], W & H must match G output resolution
+        *,
+        num_steps=1000,
+        w_avg_samples=10000,
+        initial_learning_rate=0.1,
+        lr_rampdown_length=0.25,
+        lr_rampup_length=0.05,
+        verbose=False,
+        device: torch.device,
+        noise_mode="const",
+        w_start_pivot=None,
+        seed: int = 64,
+        save_img_step: bool = False,
+        paste_color: bool = False,
+        color: torch.Tensor = torch.tensor([-1., 1., -1.]),
+        epsilon=1.0,
+        pbar=None
 ):
     assert G.img_channels >= target.shape[1]
-    G = copy.deepcopy(G).eval().requires_grad_(False).to(device) # type: ignore
+    G = copy.deepcopy(G).eval().requires_grad_(False).to(device)  # type: ignore
 
-    if w_start_pivot==None:
+    if w_start_pivot == None:
         z_samples = torch.from_numpy(np.random.RandomState(seed).randn(w_avg_samples, G.z_dim)).to(device)
         if not G.c_dim:
             c_samples = None
@@ -178,9 +178,9 @@ def project(
 
         w_samples = G.mapping(z_samples, c_samples)  # [N, L, C]
 
-        w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)       # [N, 1, C]
-        w_avg = np.mean(w_samples, axis=0, keepdims=True)      # [1, 1, C]
-        w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device, requires_grad=True) # pylint: disable=not-callable
+        w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C]
+        w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C]
+        w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device, requires_grad=True)  # pylint: disable=not-callable
     else:
         w_opt = w_start_pivot[None]
         w_opt.requires_grad_(True)
@@ -196,17 +196,17 @@ def project(
     all_images = []
     color = color.to(device)
     target = target.to(device)
-    target = (target + 1) * (255/2)
+    target = (target + 1) * (255 / 2)
     if target.shape[2] > 256:
-            target = F.interpolate(target, size=(256, 256), mode='area')
+        target = F.interpolate(target, size=(256, 256), mode='area')
     if not paste_color:
         if save_img_step: target_np = target.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-        target_features = vgg16(target[:,:3], resize_images=False, return_lpips=True)
-        if target.shape[1] == 4: target_features += vgg16(target[:,3:4].repeat(1,3,1,1), resize_images=False, return_lpips=True)
+        target_features = vgg16(target[:, :3], resize_images=False, return_lpips=True)
+        if target.shape[1] == 4: target_features += vgg16(target[:, 3:4].repeat(1, 3, 1, 1), resize_images=False, return_lpips=True)
     close_pbar = False
-    if pbar is None: 
-        pbar=trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))
-        close_pbar=True
+    if pbar is None:
+        pbar = trange(num_steps, desc='optimization Latent', unit='step', disable=(not verbose))
+        close_pbar = True
     for step in range(num_steps):
         # Learning rate schedule.
         t = step / num_steps
@@ -218,23 +218,23 @@ def project(
             param_group['lr'] = lr
 
         # Synth images from opt_w.
-        synth_images = G.synthesis(w_opt[0].repeat(1,G.num_ws,1), noise_mode=noise_mode)
-        synth_images = (synth_images + 1) * (255/2)
+        synth_images = G.synthesis(w_opt[0].repeat(1, G.num_ws, 1), noise_mode=noise_mode)
+        synth_images = (synth_images + 1) * (255 / 2)
         img_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
         all_images.append(img_np)
         if synth_images.shape[2] > 256:
             synth_images = F.interpolate(synth_images, size=(256, 256), mode='area')
 
         if paste_color:
-            target_edited = pasteColor(synth_images.clone().clamp(0,255), target.clone(), color, epsilon)
+            target_edited = replaceOrPasteColor(synth_images.clone().clamp(0, 255), target.clone(), color, epsilon, paste=True)
             if save_img_step: target_np = target_edited.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
             target_features = vgg16(target_edited, resize_images=False, return_lpips=True)
 
         if save_img_step: PIL.Image.fromarray(np.concatenate([img_np, target_np]), 'RGB').save(f'out/step_{step}.png')
 
         # Features for synth images.
-        synth_features = vgg16(synth_images[:,:3], resize_images=False, return_lpips=True)
-        if target.shape[1] == 4: synth_features += vgg16(synth_images[:,3:4].repeat(1,3,1,1), resize_images=False, return_lpips=True)
+        synth_features = vgg16(synth_images[:, :3], resize_images=False, return_lpips=True)
+        if target.shape[1] == 4: synth_features += vgg16(synth_images[:, 3:4].repeat(1, 3, 1, 1), resize_images=False, return_lpips=True)
         lpips_loss = (target_features - synth_features).square().sum()
 
         # Step
@@ -259,15 +259,15 @@ def project(
 @click.option('--run-pti', help='run pivotal tuning', is_flag=True)
 @click.option('--pti-steps', help='Number of pti steps', type=int, default=350, show_default=True)
 def run_projection(
-    network_pkl: str,
-    target_fname: str,
-    outdir: str,
-    save_video: bool,
-    seed: int,
-    inv_steps: int,
-    w_init: str,
-    run_pti: bool,
-    pti_steps: int,
+        network_pkl: str,
+        target_fname: str,
+        outdir: str,
+        save_video: bool,
+        seed: int,
+        inv_steps: int,
+        w_init: str,
+        run_pti: bool,
+        pti_steps: int,
 ):
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -276,7 +276,7 @@ def run_projection(
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
     with dnnlib.util.open_url(network_pkl) as fp:
-        G = legacy.load_network_pkl(fp)['G_ema'].to(device) # type: ignore
+        G = legacy.load_network_pkl(fp)['G_ema'].to(device)  # type: ignore
 
     # Load target image.
     target_pil = PIL.Image.open(target_fname).convert('RGB')
@@ -293,13 +293,13 @@ def run_projection(
         print('Running Latent Optimization...')
         all_images, projected_w = project(
             G,
-            target=torch.tensor(target_uint8.transpose([2, 0, 1]), device=device), # pylint: disable=not-callable
+            target=torch.tensor(target_uint8.transpose([2, 0, 1]), device=device),  # pylint: disable=not-callable
             num_steps=inv_steps,
             device=device,
             verbose=True,
             noise_mode='const',
         )
-        print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
+        print(f'Elapsed time: {(perf_counter() - start_time):.1f} s')
     else:
         projected_w = torch.from_numpy(np.load(w_init)['w'])[0].to(device)
 
@@ -317,13 +317,13 @@ def run_projection(
             verbose=True,
         )
         all_images += gen_images
-        print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
+        print(f'Elapsed time: {(perf_counter() - start_time):.1f} s')
 
     # Render debug output: optional video and projected image and W vector.
     os.makedirs(outdir, exist_ok=True)
     if save_video:
         video = imageio.get_writer(f'{outdir}/proj.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
-        print (f'Saving optimization progress video "{outdir}/proj.mp4"')
+        print(f'Saving optimization progress video "{outdir}/proj.mp4"')
         for synth_image in all_images:
             video.append_data(np.concatenate([target_uint8, synth_image], axis=1))
         video.close()
@@ -331,7 +331,7 @@ def run_projection(
     # Save final projected frame and W vector.
     target_pil.save(f'{outdir}/target.png')
     synth_image = G.synthesis(projected_w.repeat(1, G.num_ws, 1))
-    synth_image = (synth_image + 1) * (255/2)
+    synth_image = (synth_image + 1) * (255 / 2)
     synth_image = synth_image.permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
     PIL.Image.fromarray(synth_image, 'RGB').save(f'{outdir}/proj.png')
 
@@ -343,8 +343,8 @@ def run_projection(
     with open(f"{outdir}/G.pkl", 'wb') as f:
         dill.dump(snapshot_data, f)
 
-    #----------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
-    run_projection() # pylint: disable=no-value-for-parameter
+    run_projection()  # pylint: disable=no-value-for-parameter
