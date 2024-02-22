@@ -17,6 +17,8 @@ import dnnlib
 import legacy
 from metrics import metric_utils
 import timm
+import sys
+sys.path.append('.')
 from utils.replace_color import replaceOrPasteColor
 
 
@@ -274,7 +276,7 @@ def run_projection(
 
     # Load networks.
     print('Loading networks from "%s"...' % network_pkl)
-    device = torch.device('cuda')
+    device = torch.device('cuda:1')
     with dnnlib.util.open_url(network_pkl) as fp:
         G = legacy.load_network_pkl(fp)['G_ema'].to(device)  # type: ignore
 
@@ -285,6 +287,7 @@ def run_projection(
     target_pil = target_pil.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
     target_pil = target_pil.resize((G.img_resolution, G.img_resolution), PIL.Image.LANCZOS)
     target_uint8 = np.array(target_pil, dtype=np.uint8)
+    target_tensor = torch.tensor(target_uint8.transpose([2, 0, 1]), device=device, dtype=torch.float)[None].div(255 / 2).sub(1)
 
     # Latent optimization
     start_time = perf_counter()
@@ -293,7 +296,7 @@ def run_projection(
         print('Running Latent Optimization...')
         all_images, projected_w = project(
             G,
-            target=torch.tensor(target_uint8.transpose([2, 0, 1]), device=device),  # pylint: disable=not-callable
+            target=target_tensor,  # pylint: disable=not-callable
             num_steps=inv_steps,
             device=device,
             verbose=True,
@@ -311,7 +314,7 @@ def run_projection(
         gen_images, G = pivotal_tuning(
             G,
             projected_w,
-            target=torch.tensor(target_uint8.transpose([2, 0, 1]), device=device),
+            target=target_tensor[0].add(1).mul(255 / 2),
             device=device,
             num_steps=pti_steps,
             verbose=True,
@@ -322,6 +325,7 @@ def run_projection(
     # Render debug output: optional video and projected image and W vector.
     os.makedirs(outdir, exist_ok=True)
     if save_video:
+        os.environ["IMAGEIO_FFMPEG_EXE"] = "/usr/bin/ffmpeg"
         video = imageio.get_writer(f'{outdir}/proj.mp4', mode='I', fps=60, codec='libx264', bitrate='16M')
         print(f'Saving optimization progress video "{outdir}/proj.mp4"')
         for synth_image in all_images:
