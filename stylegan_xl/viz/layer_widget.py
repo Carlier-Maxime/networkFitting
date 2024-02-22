@@ -9,22 +9,23 @@
 import imgui
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class LayerWidget:
     def __init__(self, viz):
-        self.viz            = viz
-        self.prev_layers    = None
-        self.cur_layer      = None
-        self.sel_channels   = 3
-        self.base_channel   = 0
-        self.img_scale_db   = 0
-        self.img_normalize  = False
-        self.fft_show       = False
-        self.fft_all        = True
-        self.fft_range_db   = 50
-        self.fft_beta       = 8
-        self.refocus        = False
+        self.viz = viz
+        self.prev_layers = None
+        self.cur_layer = None
+        self.sel_channels = 3
+        self.base_channel = 0
+        self.img_scale_db = 0
+        self.img_normalize = False
+        self.fft_show = False
+        self.fft_all = True
+        self.fft_range_db = 50
+        self.fft_beta = 8
+        self.refocus = False
 
     @imgui_utils.scoped_by_object_id
     def __call__(self, show=True):
@@ -64,8 +65,9 @@ class LayerWidget:
                 if selected:
                     self.cur_layer = layer.name
                     if self.refocus:
-                        imgui.set_scroll_here()
-                        viz.skip_frame() # Focus will change on next frame.
+                        imgui.set_scroll_here_x()
+                        imgui.set_scroll_here_y()
+                        viz.skip_frame()  # Focus will change on next frame.
                         self.refocus = False
                 imgui.same_line(width - viz.font_size * 13)
                 imgui.text_colored('x'.join(str(x) for x in layer.shape[2:]), *dim_color)
@@ -124,10 +126,10 @@ class LayerWidget:
             stats = viz.result.get('stats', None)
             stats = [f'{stats[idx]:g}' if stats is not None else 'N/A' for idx in range(6)]
             rows = [
-                ['Statistic',   'All channels', 'Selected'],
-                ['Mean',        stats[0],       stats[1]],
-                ['Std',         stats[2],       stats[3]],
-                ['Max',         stats[4],       stats[5]],
+                ['Statistic', 'All channels', 'Selected'],
+                ['Mean', stats[0], stats[1]],
+                ['Std', stats[2], stats[3]],
+                ['Max', stats[4], stats[5]],
             ]
             height = imgui.get_text_line_height_with_spacing() * len(rows) + viz.spacing
             imgui.push_style_color(imgui.COLOR_CHILD_BACKGROUND, *bg_color)
@@ -165,7 +167,7 @@ class LayerWidget:
             # FFT beta.
             with imgui_utils.grayed_out(not self.fft_show):
                 with imgui_utils.item_width(-1 - viz.button_w - viz.spacing):
-                    _changed, self.fft_beta = imgui.slider_float('##fft_beta', self.fft_beta, min_value=0, max_value=50, format='Kaiser beta %.2f', power=2.63)
+                    _changed, self.fft_beta = imgui.slider_float('##fft_beta', self.fft_beta, min_value=0, max_value=50, format='Kaiser beta %.2f', flags=imgui.SLIDER_FLAGS_LOGARITHMIC)
                 imgui.same_line()
                 if imgui_utils.button('Reset##fft_beta', width=-1, enabled=(self.fft_beta != 8)):
                     self.fft_beta = 8
@@ -180,4 +182,4 @@ class LayerWidget:
         if self.fft_show:
             viz.args.update(fft_all=self.fft_all, fft_range_db=self.fft_range_db, fft_beta=self.fft_beta)
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

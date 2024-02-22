@@ -11,17 +11,18 @@ import imgui
 import dnnlib
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class EquivarianceWidget:
     def __init__(self, viz):
-        self.viz            = viz
-        self.xlate          = dnnlib.EasyDict(x=0, y=0, anim=False, round=False, speed=1e-2)
-        self.xlate_def      = dnnlib.EasyDict(self.xlate)
-        self.rotate         = dnnlib.EasyDict(val=0, anim=False, speed=5e-3)
-        self.rotate_def     = dnnlib.EasyDict(self.rotate)
-        self.opts           = dnnlib.EasyDict(untransform=False)
-        self.opts_def       = dnnlib.EasyDict(self.opts)
+        self.viz = viz
+        self.xlate = dnnlib.EasyDict(x=0, y=0, anim=False, round=False, speed=1e-2)
+        self.xlate_def = dnnlib.EasyDict(self.xlate)
+        self.rotate = dnnlib.EasyDict(val=0, anim=False, speed=5e-3)
+        self.rotate_def = dnnlib.EasyDict(self.rotate)
+        self.opts = dnnlib.EasyDict(untransform=False)
+        self.opts_def = dnnlib.EasyDict(self.opts)
 
     @imgui_utils.scoped_by_object_id
     def __call__(self, show=True):
@@ -47,7 +48,7 @@ class EquivarianceWidget:
             _clicked, self.xlate.round = imgui.checkbox('Round##xlate', self.xlate.round)
             imgui.same_line()
             with imgui_utils.item_width(-1 - viz.button_w - viz.spacing), imgui_utils.grayed_out(not self.xlate.anim):
-                changed, speed = imgui.slider_float('##xlate_speed', self.xlate.speed, 0, 0.5, format='Speed %.5f', power=5)
+                changed, speed = imgui.slider_float('##xlate_speed', self.xlate.speed, 0, 0.5, format='Speed %.5f', flags=imgui.SLIDER_FLAGS_LOGARITHMIC)
                 if changed:
                     self.xlate.speed = speed
             imgui.same_line()
@@ -71,7 +72,7 @@ class EquivarianceWidget:
             _clicked, self.rotate.anim = imgui.checkbox('Anim##rotate', self.rotate.anim)
             imgui.same_line()
             with imgui_utils.item_width(-1 - viz.button_w - viz.spacing), imgui_utils.grayed_out(not self.rotate.anim):
-                changed, speed = imgui.slider_float('##rotate_speed', self.rotate.speed, -1, 1, format='Speed %.4f', power=3)
+                changed, speed = imgui.slider_float('##rotate_speed', self.rotate.speed, -1, 1, format='Speed %.4f', flags=imgui.SLIDER_FLAGS_LOGARITHMIC)
                 if changed:
                     self.rotate.speed = speed
             imgui.same_line()
@@ -79,7 +80,7 @@ class EquivarianceWidget:
                 self.rotate = dnnlib.EasyDict(self.rotate_def)
 
         if show:
-            imgui.set_cursor_pos_x(imgui.get_content_region_max()[0] - 1 - viz.button_w*1 - viz.font_size*16)
+            imgui.set_cursor_pos_x(imgui.get_content_region_max()[0] - 1 - viz.button_w * 1 - viz.font_size * 16)
             _clicked, self.opts.untransform = imgui.checkbox('Untransform', self.opts.untransform)
             imgui.same_line(imgui.get_content_region_max()[0] - 1 - viz.button_w)
             if imgui_utils.button('Reset##opts', width=-1, enabled=(self.opts != self.opts_def)):
@@ -106,10 +107,10 @@ class EquivarianceWidget:
         angle = self.rotate.val * np.pi * 2
 
         viz.args.input_transform = [
-            [np.cos(angle),  np.sin(angle), pos[0]],
+            [np.cos(angle), np.sin(angle), pos[0]],
             [-np.sin(angle), np.cos(angle), pos[1]],
             [0, 0, 1]]
 
         viz.args.update(untransform=self.opts.untransform)
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

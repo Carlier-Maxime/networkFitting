@@ -11,14 +11,15 @@ import imgui
 import dnnlib
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class LatentWidget:
     def __init__(self, viz):
-        self.viz        = viz
-        self.latent     = dnnlib.EasyDict(x=0, y=0, anim=False, speed=0.25)
+        self.viz = viz
+        self.latent = dnnlib.EasyDict(x=0, y=0, anim=False, speed=0.25)
         self.latent_def = dnnlib.EasyDict(self.latent)
-        self.step_y     = 100
+        self.step_y = 100
 
     def drag(self, dx, dy):
         viz = self.viz
@@ -53,7 +54,7 @@ class LatentWidget:
             _clicked, self.latent.anim = imgui.checkbox('Anim', self.latent.anim)
             imgui.same_line(round(viz.font_size * 27.7))
             with imgui_utils.item_width(-1 - viz.button_w * 2 - viz.spacing * 2), imgui_utils.grayed_out(not self.latent.anim):
-                changed, speed = imgui.slider_float('##speed', self.latent.speed, -5, 5, format='Speed %.3f', power=3)
+                changed, speed = imgui.slider_float('##speed', self.latent.speed, -5, 5, format='Speed %.3f', flags=imgui.SLIDER_FLAGS_LOGARITHMIC)
                 if changed:
                     self.latent.speed = speed
             imgui.same_line()
@@ -66,7 +67,7 @@ class LatentWidget:
 
         if self.latent.anim:
             self.latent.x += viz.frame_delta * self.latent.speed
-        viz.args.w0_seeds = [] # [[seed, weight], ...]
+        viz.args.w0_seeds = []  # [[seed, weight], ...]
         for ofs_x, ofs_y in [[0, 0], [1, 0], [0, 1], [1, 1]]:
             seed_x = np.floor(self.latent.x) + ofs_x
             seed_y = np.floor(self.latent.y) + ofs_y
@@ -75,4 +76,4 @@ class LatentWidget:
             if weight > 0:
                 viz.args.w0_seeds.append([seed, weight])
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
