@@ -55,7 +55,7 @@ def fitting(**kwargs):
     color = torch.tensor(color).to(device)
     try:
         epsilon = float(opts.epsilon)
-    except:
+    except ValueError:
         epsilon = opts.epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
