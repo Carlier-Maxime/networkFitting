@@ -1,17 +1,18 @@
 import os
 from pathlib import Path
-import PIL.Image
 from typing import List
+
+import PIL.Image
 import click
 import numpy as np
 import torch
 from tqdm import tqdm
 
-import legacy
 import dnnlib
-from training.training_loop import save_image_grid
-from torch_utils import gen_utils
+import legacy
 from gen_images import parse_range
+from torch_utils import gen_utils
+
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
@@ -25,16 +26,16 @@ from gen_images import parse_range
 @click.option('--outdir', help='Where to save the output images', type=str, required=True, metavar='DIR')
 @click.option('--desc', help='String to include in result dir name', metavar='STR', type=str)
 def generate_samplesheet(
-    network_pkl: str,
-    truncation_psi: float,
-    seed: int,
-    centroids_path: str,
-    classes: List[int],
-    samples_per_class: int,
-    batch_gpu: int,
-    grid_width: int,
-    outdir: str,
-    desc: str,
+        network_pkl: str,
+        truncation_psi: float,
+        seed: int,
+        centroids_path: str,
+        classes: List[int],
+        samples_per_class: int,
+        batch_gpu: int,
+        grid_width: int,
+        outdir: str,
+        desc: str,
 ):
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
@@ -65,6 +66,7 @@ def generate_samplesheet(
     grid_width = grid_width - grid_width % samples_per_class
     images = gen_utils.create_image_grid(np.concatenate(images), grid_size=(grid_width, None))
     PIL.Image.fromarray(images, 'RGB').save(run_dir / 'sheet.png')
+
 
 if __name__ == "__main__":
     generate_samplesheet()

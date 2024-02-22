@@ -1,28 +1,30 @@
 import torch
-from tqdm import tqdm
-from configs import hyperparameters
-from coaches.base_coach import BaseCoach
 from PIL import Image
+from tqdm import tqdm
+
+from coaches.base_coach import BaseCoach
+from configs import hyperparameters
+
 
 class SingleIDCoach(BaseCoach):
 
-    def __init__(self, device:torch.device, data_loader, network_path, outdir:str='out', save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True, load_w_pivot:bool=False):
+    def __init__(self, device: torch.device, data_loader, network_path, outdir: str = 'out', save_latent: bool = False, save_video_latent: bool = False, save_video_pti: bool = False, save_img_result: bool = False, seed: int = 64, G=None, verbose: bool = True, load_w_pivot: bool = False):
         super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose, load_w_pivot)
 
-    def train(self, first_inv_steps:int=1000, inv_steps:int=100, pti_steps:int=500, max_images:int=-1, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False):
+    def train(self, first_inv_steps: int = 1000, inv_steps: int = 100, pti_steps: int = 500, max_images: int = -1, paste_color: bool = False, color: torch.Tensor = torch.tensor([-1., 1., -1.]), epsilon=1.0, save_img_step: bool = False):
         use_ball_holder = True
         w_pivot = None
-        if max_images==-1 or max_images>len(self.data_loader.dataset): max_images = len(self.data_loader.dataset)
+        if max_images == -1 or max_images > len(self.data_loader.dataset): max_images = len(self.data_loader.dataset)
         pbar1 = tqdm(total=max_images, desc='fitting', unit='image', disable=(not self.verbose))
         pbar2 = tqdm(total=first_inv_steps, desc='optimization Latent', unit='step', disable=(not self.verbose))
         pbar3 = tqdm(total=pti_steps, desc='pivotal tuning', unit='step', disable=(not self.verbose))
         self.open_videos()
         for fname, image in self.data_loader:
-            seed_images=[]
-            target_images=[]
+            seed_images = []
+            target_images = []
             image_name = fname[0]
             if self.image_counter >= max_images: break
-            w_pivot = self.get_inversions(image_name, image, (inv_steps if w_pivot!=None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar2)
+            w_pivot = self.get_inversions(image_name, image, (inv_steps if w_pivot != None else first_inv_steps), w_start_pivot=w_pivot, seed=self.seed, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar2)
 
             w_pivot = w_pivot.to(self.device)
             if self.save_latent: torch.save(w_pivot, f'{self.outdir}/latent_{image_name}.pt')
@@ -30,15 +32,15 @@ class SingleIDCoach(BaseCoach):
 
             generated_images = None
             for i in range(pti_steps):
-                generated_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
+                generated_images = self.forward(w_pivot[0].repeat(1, self.G.num_ws, 1))
                 if self.save_video_pti:
                     synth_images = self.forward(self.w_seed)
-                    synth_images = (synth_images + 1) * (255/2)
+                    synth_images = (synth_images + 1) * (255 / 2)
                     synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
                     seed_images.append(synth_images_np)
                     del synth_images
 
-                    synth_images = (generated_images + 1) * (255/2)
+                    synth_images = (generated_images + 1) * (255 / 2)
                     synth_images_np = synth_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
                     target_images.append(synth_images_np)
                     del synth_images
@@ -49,21 +51,21 @@ class SingleIDCoach(BaseCoach):
 
                 loss.backward()
                 self.optimizer.step()
-                use_ball_holder = (i+1) % hyperparameters.locality_regularization_interval == 0
+                use_ball_holder = (i + 1) % hyperparameters.locality_regularization_interval == 0
 
                 pbar3.update()
                 pbar3.set_postfix_str(f'loss: {float(loss):<5.2f}')
             self.image_counter += 1
             if self.save_img_result:
-                if generated_images is None: generated_images = self.forward(w_pivot[0].repeat(1,self.G.num_ws,1))
-                generated_images = (generated_images + 1) * (255/2)
+                if generated_images is None: generated_images = self.forward(w_pivot[0].repeat(1, self.G.num_ws, 1))
+                generated_images = (generated_images + 1) * (255 / 2)
                 generated_images_np = generated_images.clone().detach().permute(0, 2, 3, 1).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
-                Image.fromarray(generated_images_np, 'RGBA' if generated_images_np.shape[2]==4 else 'RGB').save(f'{self.outdir}/project_{image_name}.png')
+                Image.fromarray(generated_images_np, 'RGBA' if generated_images_np.shape[2] == 4 else 'RGB').save(f'{self.outdir}/project_{image_name}.png')
             del generated_images
-            if pbar1.n==0:
+            if pbar1.n == 0:
                 pbar2.total = inv_steps
                 pbar2.n = inv_steps
-            if pbar1.n!=max_images-1:
+            if pbar1.n != max_images - 1:
                 pbar3.reset()
                 pbar2.reset()
             pbar1.update()
@@ -75,4 +77,4 @@ class SingleIDCoach(BaseCoach):
         pbar2.close()
         pbar3.close()
         self.close_videos()
-        if pti_steps>0: torch.save(self.G, f'{self.outdir}/network.pt')
+        if pti_steps > 0: torch.save(self.G, f'{self.outdir}/network.pt')

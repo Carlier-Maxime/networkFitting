@@ -1,5 +1,5 @@
-import itertools
 import os
+import sys
 
 import click
 import cv2
@@ -9,7 +9,6 @@ import torch.nn.functional as F
 from PIL import Image
 from torch.utils.data import DataLoader
 
-import sys
 sys.path.append(".")
 from stylegan_xl import dnnlib
 
@@ -75,14 +74,14 @@ def maskColor(imgs, color, epsilon, grow_size=1):
 
 
 def save_mask_stain(maskStains, min_light=32):
-    color_interval = (256-min_light)
+    color_interval = (256 - min_light)
     mask_color = ((maskStains / maskStains.max()) * (color_interval ** 3 - 1)).repeat(3, 1, 1, 1)
     mask_color[0] = (mask_color[0] % color_interval) + min_light
     mask_color[1] = ((mask_color[1] / color_interval) % color_interval) + min_light
     mask_color[2] = ((mask_color[2] / color_interval) / color_interval) + min_light
     mask_color[mask_color == min_light] = 0
     mask_color = mask_color.clip(0, 255).to(torch.uint8).permute(1, 2, 3, 0).cpu().numpy()
-    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{opts.outdir_mask_stained}/mask_stain{"" if opts.current_index is None else opts.current_index+i}.png')
+    for i in range(len(mask_color)): Image.fromarray(mask_color[i]).save(f'{opts.outdir_mask_stained}/mask_stain{"" if opts.current_index is None else opts.current_index + i}.png')
 
 
 def getCentersOfStain(masks: torch.Tensor):
@@ -92,7 +91,7 @@ def getCentersOfStain(masks: torch.Tensor):
     pairs = torch.stack((markers[:, :-1][sames], markers[:, 1:][sames]), dim=1).unique(dim=0)
     for k in range(len(pairs)):
         markers[markers == pairs[k, 0]] = pairs[k, 1]
-        pairs[k+1:][pairs[k+1:].eq(pairs[k, 0])] = pairs[k, 1]
+        pairs[k + 1:][pairs[k + 1:].eq(pairs[k, 0])] = pairs[k, 1]
     if opts.save_mask: save_mask_stain(markers)
     markers_id = markers.unique()
     markers_id = markers_id[markers_id > 0]
@@ -114,13 +113,13 @@ def getMask(imgs, color, epsilon, grow_size=1):
     if opts.save_ccs:
         centers = getCentersOfStain(cond_grow if opts.use_grow else cond)
         for i in range(len(centers)):
-            save_index = "" if opts.current_index is None else opts.current_index+i
+            save_index = "" if opts.current_index is None else opts.current_index + i
             print(f"Number of color stain detected in image {save_index} : {len(centers[i])}")
             np.save(f"{opts.outdir_ccs}/centers{save_index}.npy", centers[i].cpu().numpy())
     cond = cond_grow
     if opts.save_mask:
         masks = (cond.to(torch.uint8) * 255).cpu().numpy()
-        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{opts.outdir_mask}/mask{'' if opts.current_index is None else opts.current_index+i}.png")
+        for i in range(len(masks)): Image.fromarray(masks[i]).save(f"{opts.outdir_mask}/mask{'' if opts.current_index is None else opts.current_index + i}.png")
     return cond
 
 
@@ -225,11 +224,11 @@ global opts
 def main(**kwargs):
     global opts
     opts = dnnlib.EasyDict(kwargs)
-    opts.outdir = opts.outdir+'/'+opts.path1.split("/")[-1].split(".")[0]
-    opts.outdir_ccs = opts.outdir+'/ccs'
-    opts.outdir_mask = opts.outdir+'/mask'
-    opts.outdir_mask_stained = opts.outdir+'/mask_stained'
-    opts.outdir_result = opts.outdir+'/result'
+    opts.outdir = opts.outdir + '/' + opts.path1.split("/")[-1].split(".")[0]
+    opts.outdir_ccs = opts.outdir + '/ccs'
+    opts.outdir_mask = opts.outdir + '/mask'
+    opts.outdir_mask_stained = opts.outdir + '/mask_stained'
+    opts.outdir_result = opts.outdir + '/result'
     opts.device = torch.device(opts.device)
     for directory in [opts.outdir, opts.outdir_mask, opts.outdir_mask_stained, opts.outdir_ccs, opts.outdir_result]: os.makedirs(directory, exist_ok=True)
     opts.color = opts.color.to(opts.device)

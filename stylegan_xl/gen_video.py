@@ -8,23 +8,22 @@
 
 """Generate lerp videos using pretrained network pickle."""
 
-import copy
-import os
 import re
 from typing import List, Optional, Tuple, Union
 
 import click
-import dnnlib
 import imageio
 import numpy as np
 import scipy.interpolate
 import torch
 from tqdm import tqdm
 
+import dnnlib
 import legacy
 from torch_utils import gen_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def layout_grid(img, grid_w=None, grid_h=1, float_to_uint8=True, chw_to_hwc=True, to_numpy=True):
     batch_size, channels, img_h, img_w = img.shape
@@ -42,19 +41,20 @@ def layout_grid(img, grid_w=None, grid_h=1, float_to_uint8=True, chw_to_hwc=True
         img = img.cpu().numpy()
     return img
 
-#----------------------------------------------------------------------------
 
-def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind='cubic', grid_dims=(1,1), num_keyframes=None, wraps=2, truncation_psi=1, device=torch.device('cuda'), centroids_path=None, class_idx=None, **video_kwargs):
+# ----------------------------------------------------------------------------
+
+def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kind='cubic', grid_dims=(1, 1), num_keyframes=None, wraps=2, truncation_psi=1, device=torch.device('cuda'), centroids_path=None, class_idx=None, **video_kwargs):
     grid_w = grid_dims[0]
     grid_h = grid_dims[1]
 
     if num_keyframes is None:
-        if len(seeds) % (grid_w*grid_h) != 0:
+        if len(seeds) % (grid_w * grid_h) != 0:
             raise ValueError('Number of input seeds must be divisible by grid W*H')
-        num_keyframes = len(seeds) // (grid_w*grid_h)
+        num_keyframes = len(seeds) // (grid_w * grid_h)
 
-    all_seeds = np.zeros(num_keyframes*grid_h*grid_w, dtype=np.int64)
-    for idx in range(num_keyframes*grid_h*grid_w):
+    all_seeds = np.zeros(num_keyframes * grid_h * grid_w, dtype=np.int64)
+    for idx in range(num_keyframes * grid_h * grid_w):
         all_seeds[idx] = seeds[idx % len(seeds)]
 
     if shuffle_seed is not None:
@@ -75,7 +75,7 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
         )
     ws = torch.cat(ws)
 
-    _ = G.synthesis(ws[:1]) # warm up
+    _ = G.synthesis(ws[:1])  # warm up
     ws = ws.reshape(grid_h, grid_w, num_keyframes, *ws.shape[1:])
 
     # Interpolation.
@@ -102,7 +102,8 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
         video_out.append_data(layout_grid(torch.stack(imgs), grid_w=grid_w, grid_h=grid_h))
     video_out.close()
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_range(s: Union[str, List[int]]) -> List[int]:
     '''Parse a comma separated list of numbers or ranges and return a list of ints.
@@ -115,14 +116,15 @@ def parse_range(s: Union[str, List[int]]) -> List[int]:
     for p in s.split(','):
         m = range_re.match(p)
         if m:
-            ranges.extend(range(int(m.group(1)), int(m.group(2))+1))
+            ranges.extend(range(int(m.group(1)), int(m.group(2)) + 1))
         else:
             ranges.append(int(p))
     return ranges
 
-#----------------------------------------------------------------------------
 
-def parse_tuple(s: Union[str, Tuple[int,int]]) -> Tuple[int, int]:
+# ----------------------------------------------------------------------------
+
+def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
     '''Parse a 'M,N' or 'MxN' integer tuple.
 
     Example:
@@ -135,13 +137,14 @@ def parse_tuple(s: Union[str, Tuple[int,int]]) -> Tuple[int, int]:
         return (int(m.group(1)), int(m.group(2)))
     raise ValueError(f'cannot parse tuple {s}')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
 @click.option('--seeds', type=parse_range, help='List of random seeds', required=True)
 @click.option('--shuffle-seed', type=int, help='Random seed to use for shuffling seed order', default=None)
-@click.option('--grid', type=parse_tuple, help='Grid width/height, e.g. \'4x3\' (default: 1x1)', default=(1,1))
+@click.option('--grid', type=parse_tuple, help='Grid width/height, e.g. \'4x3\' (default: 1x1)', default=(1, 1))
 @click.option('--num-keyframes', type=int, help='Number of seeds to interpolate through.  If not specified, determine based on the length of the seeds array given by --seeds.', default=None)
 @click.option('--w-frames', type=int, help='Number of frames to interpolate between latents', default=120)
 @click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
@@ -149,16 +152,16 @@ def parse_tuple(s: Union[str, Tuple[int,int]]) -> Tuple[int, int]:
 @click.option('--output', help='Output .mp4 filename', type=str, required=True, metavar='FILE')
 @click.option('--class', 'class_idx', type=parse_range, help='Class label (unconditional if not specified)')
 def generate_images(
-    network_pkl: str,
-    seeds: List[int],
-    shuffle_seed: Optional[int],
-    truncation_psi: float,
-    centroids_path: str,
-    grid: Tuple[int,int],
-    num_keyframes: Optional[int],
-    w_frames: int,
-    output: str,
-    class_idx: Optional[List[int]],
+        network_pkl: str,
+        seeds: List[int],
+        shuffle_seed: Optional[int],
+        truncation_psi: float,
+        centroids_path: str,
+        grid: Tuple[int, int],
+        num_keyframes: Optional[int],
+        w_frames: int,
+        output: str,
+        class_idx: Optional[List[int]],
 ):
     """Render a latent vector interpolation video.
 
@@ -185,13 +188,14 @@ def generate_images(
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
     with dnnlib.util.open_url(network_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
+        G = legacy.load_network_pkl(f)['G_ema'].to(device)  # type: ignore
 
     gen_interp_video(G=G, mp4=output, bitrate='12M', grid_dims=grid, num_keyframes=num_keyframes, w_frames=w_frames, seeds=seeds, shuffle_seed=shuffle_seed, truncation_psi=truncation_psi, centroids_path=centroids_path, class_idx=class_idx)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    generate_images() # pylint: disable=no-value-for-parameter
+    generate_images()  # pylint: disable=no-value-for-parameter
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

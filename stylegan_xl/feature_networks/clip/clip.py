@@ -193,6 +193,7 @@ def tokenize(texts: Union[str, List[str]], context_length: int = 77) -> torch.Lo
 
     return result
 
+
 def pdist(sample_1, sample_2, norm=2, eps=1e-5):
     r"""Compute the matrix of all squared pairwise distances.
     Arguments
@@ -211,8 +212,8 @@ def pdist(sample_1, sample_2, norm=2, eps=1e-5):
     n_1, n_2 = sample_1.size(0), sample_2.size(0)
     norm = float(norm)
     if norm == 2.:
-        norms_1 = torch.sum(sample_1**2, dim=1, keepdim=True)
-        norms_2 = torch.sum(sample_2**2, dim=1, keepdim=True)
+        norms_1 = torch.sum(sample_1 ** 2, dim=1, keepdim=True)
+        norms_2 = torch.sum(sample_2 ** 2, dim=1, keepdim=True)
         norms = (norms_1.expand(n_1, n_2) +
                  norms_2.transpose(0, 1).expand(n_1, n_2))
         distances_squared = norms - 2 * sample_1.mm(sample_2.t())

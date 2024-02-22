@@ -6,9 +6,9 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-import numpy as np
-import imgui
 import dnnlib
+import imgui
+import numpy as np
 from gui_utils import imgui_utils
 
 

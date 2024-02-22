@@ -13,18 +13,19 @@ https://github.com/bioinf-jku/TTUR/blob/master/fid.py"""
 
 import numpy as np
 import scipy.linalg
+
 from . import metric_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def compute_fid(opts, max_real, num_gen, sfid=False, rfid=False):
     # Direct TorchScript translation of http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz
     detector_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/inception-2015-12-05.pkl'
-    detector_kwargs = dict(return_features=True) # Return raw features before the softmax layer.
+    detector_kwargs = dict(return_features=True)  # Return raw features before the softmax layer.
     if rfid:
         detector_url = 'https://s3.eu-central-1.amazonaws.com/avg-projects/stylegan_xl/feature_networks/inception_rand_full.pkl'
         detector_kwargs = {}  # random inception network returns features by default
-
 
     mu_real, sigma_real = metric_utils.compute_feature_stats_for_dataset(
         opts=opts, detector_url=detector_url, detector_kwargs=detector_kwargs,
@@ -38,8 +39,8 @@ def compute_fid(opts, max_real, num_gen, sfid=False, rfid=False):
         return float('nan')
 
     m = np.square(mu_gen - mu_real).sum()
-    s, _ = scipy.linalg.sqrtm(np.dot(sigma_gen, sigma_real), disp=False) # pylint: disable=no-member
+    s, _ = scipy.linalg.sqrtm(np.dot(sigma_gen, sigma_real), disp=False)  # pylint: disable=no-member
     fid = np.real(m + np.trace(sigma_gen + sigma_real - s * 2))
     return float(fid)
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

@@ -1,20 +1,22 @@
 import abc
 import os
 import os.path
-from criteria.localitly_regulizer import Space_Regulizer
-import torch
-from lpips import LPIPS
-from configs import hyperparameters
-from criteria import l2_loss
-from utils.models_utils import toogle_grad, load_network
-import sys
-from stylegan_xl.run_inversion import project
-from stylegan_xl.torch_utils import gen_utils
+
 import imageio
 import numpy as np
+import torch
+from lpips import LPIPS
+
+from configs import hyperparameters
+from criteria import l2_loss
+from criteria.localitly_regulizer import Space_Regulizer
+from stylegan_xl.run_inversion import project
+from stylegan_xl.torch_utils import gen_utils
+from utils.models_utils import toogle_grad, load_network
+
 
 class BaseCoach:
-    def __init__(self, device:torch.device, data_loader, network_path, outdir, save_latent:bool=False, save_video_latent:bool=False, save_video_pti:bool=False, save_img_result:bool=False, seed:int=64, G=None, verbose:bool=True, load_w_pivot:bool=False):
+    def __init__(self, device: torch.device, data_loader, network_path, outdir, save_latent: bool = False, save_video_latent: bool = False, save_video_pti: bool = False, save_img_result: bool = False, seed: int = 64, G=None, verbose: bool = True, load_w_pivot: bool = False):
         self.device = device
         self.data_loader = data_loader
         self.network_path = network_path
@@ -36,7 +38,7 @@ class BaseCoach:
     def restart_training(self, G=None):
 
         # Initialize networks
-        self.G = load_network(self.network_path, self.device) if G==None else G
+        self.G = load_network(self.network_path, self.device) if G == None else G
         toogle_grad(self.G, True)
 
         self.original_G = load_network(self.network_path, self.device)
@@ -44,10 +46,10 @@ class BaseCoach:
         self.space_regulizer = Space_Regulizer(self.original_G, self.lpips_loss)
         self.optimizer = self.configure_optimizers()
 
-    def get_inversions(self, image_name, image, num_steps:int=1000, w_start_pivot=None, seed:int=64, paste_color:bool=False, color:torch.Tensor=torch.tensor([-1.,1.,-1.]), epsilon=1.0, save_img_step:bool=False, pbar=None):
+    def get_inversions(self, image_name, image, num_steps: int = 1000, w_start_pivot=None, seed: int = 64, paste_color: bool = False, color: torch.Tensor = torch.tensor([-1., 1., -1.]), epsilon=1.0, save_img_step: bool = False, pbar=None):
         if image_name in self.w_pivots: return self.w_pivots[image_name]
         w = self.load_inversions(image_name) if self.load_w_pivot else None
-        if w is None: 
+        if w is None:
             imgs, w = project(self.G, image, device=torch.device(self.device), w_avg_samples=600, num_steps=num_steps, w_start_pivot=w_start_pivot, seed=seed, verbose=self.verbose, paste_color=paste_color, color=color, epsilon=epsilon, save_img_step=save_img_step, pbar=pbar)
             if self.save_video_latent:
                 self.video_append(self.videoOptiLatent, imgs)
@@ -76,8 +78,8 @@ class BaseCoach:
             l2_loss_val = l2_loss.l2_loss(real_images, generated_images)
             loss += l2_loss_val * hyperparameters.pt_l2_lambda
         if hyperparameters.pt_lpips_lambda > 0:
-            loss_lpips = self.lpips_loss(generated_images[:,:3], real_images[:,:3])
-            if real_images.shape[1]==4: loss_lpips += self.lpips_loss(generated_images[:,3:4].repeat(1,3,1,1), real_images[:,3:4].repeat(1,3,1,1))
+            loss_lpips = self.lpips_loss(generated_images[:, :3], real_images[:, :3])
+            if real_images.shape[1] == 4: loss_lpips += self.lpips_loss(generated_images[:, 3:4].repeat(1, 3, 1, 1), real_images[:, 3:4].repeat(1, 3, 1, 1))
             loss_lpips = torch.squeeze(loss_lpips)
             loss += loss_lpips * hyperparameters.pt_lpips_lambda
 
@@ -90,13 +92,13 @@ class BaseCoach:
     def forward(self, w):
         generated_images = self.G.synthesis(w, noise_mode='const', force_fp32=True)
         return generated_images
-    
-    def save_imgs_to_video(self, imgs, outfile:str, msg:str="", fps:int=60):
-        if self.verbose and msg!="": print(msg)
+
+    def save_imgs_to_video(self, imgs, outfile: str, msg: str = "", fps: int = 60):
+        if self.verbose and msg != "": print(msg)
         video = imageio.get_writer(f'{self.outdir}/{outfile}', mode='I', fps=fps, codec='libx264', bitrate='16M')
-        self.video_append(video,imgs)
+        self.video_append(video, imgs)
         video.close()
-    
+
     def video_append(self, video, imgs):
         for synth_image in imgs: video.append_data(np.array(synth_image))
 

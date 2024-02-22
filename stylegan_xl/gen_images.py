@@ -12,16 +12,17 @@ import os
 import re
 from typing import List, Optional, Tuple, Union
 
-import click
-import dnnlib
-import numpy as np
 import PIL.Image
+import click
+import numpy as np
 import torch
 
+import dnnlib
 import legacy
 from torch_utils import gen_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_range(s: Union[str, List]) -> List[int]:
     '''Parse a comma separated list of numbers or ranges and return a list of ints.
@@ -34,12 +35,13 @@ def parse_range(s: Union[str, List]) -> List[int]:
     for p in s.split(','):
         m = range_re.match(p)
         if m:
-            ranges.extend(range(int(m.group(1)), int(m.group(2))+1))
+            ranges.extend(range(int(m.group(1)), int(m.group(2)) + 1))
         else:
             ranges.append(int(p))
     return ranges
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_vec2(s: Union[str, Tuple[float, float]]) -> Tuple[float, float]:
     '''Parse a floating point 2-vector of syntax 'a,b'.
@@ -53,12 +55,13 @@ def parse_vec2(s: Union[str, Tuple[float, float]]) -> Tuple[float, float]:
         return (float(parts[0]), float(parts[1]))
     raise ValueError(f'cannot parse 2-vector {s}')
 
-#----------------------------------------------------------------------------
 
-def make_transform(translate: Tuple[float,float], angle: float):
+# ----------------------------------------------------------------------------
+
+def make_transform(translate: Tuple[float, float], angle: float):
     m = np.eye(3)
-    s = np.sin(angle/360.0*np.pi*2)
-    c = np.cos(angle/360.0*np.pi*2)
+    s = np.sin(angle / 360.0 * np.pi * 2)
+    c = np.cos(angle / 360.0 * np.pi * 2)
     m[0][0] = c
     m[0][1] = s
     m[0][2] = translate[0]
@@ -67,7 +70,8 @@ def make_transform(translate: Tuple[float,float], angle: float):
     m[1][2] = translate[1]
     return m
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
@@ -81,23 +85,24 @@ def make_transform(translate: Tuple[float,float], angle: float):
 @click.option('--rotate', help='Rotation angle in degrees', type=float, default=0, show_default=True, metavar='ANGLE')
 @click.option('--outdir', help='Where to save the output images', type=str, required=True, metavar='DIR')
 def generate_images(
-    network_pkl: str,
-    seeds: List[int],
-    batch_sz: int,
-    truncation_psi: float,
-    centroids_path: str,
-    noise_mode: str,
-    outdir: str,
-    translate: Tuple[float,float],
-    rotate: float,
-    class_idx: Optional[int]
+        network_pkl: str,
+        seeds: List[int],
+        batch_sz: int,
+        truncation_psi: float,
+        centroids_path: str,
+        noise_mode: str,
+        outdir: str,
+        translate: Tuple[float, float],
+        rotate: float,
+        class_idx: Optional[int]
 ):
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
     if network_pkl.endswith('.pkl'):
         with dnnlib.util.open_url(network_pkl) as f:
             G = legacy.load_network_pkl(f)['G_ema']
-    else: G = torch.load(network_pkl)
+    else:
+        G = torch.load(network_pkl)
     G = G.eval().requires_grad_(False).to(device)
 
     os.makedirs(outdir, exist_ok=True)
@@ -120,9 +125,9 @@ def generate_images(
         PIL.Image.fromarray(gen_utils.create_image_grid(img), 'RGB').save(f'{outdir}/seed{seed:04d}.png')
 
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    generate_images() # pylint: disable=no-value-for-parameter
+    generate_images()  # pylint: disable=no-value-for-parameter
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

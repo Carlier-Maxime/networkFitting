@@ -1,8 +1,9 @@
+import math
+import types
+
+import timm
 import torch
 import torch.nn as nn
-import timm
-import types
-import math
 import torch.nn.functional as F
 
 
@@ -12,7 +13,7 @@ class Slice(nn.Module):
         self.start_index = start_index
 
     def forward(self, x):
-        return x[:, self.start_index :]
+        return x[:, self.start_index:]
 
 
 class AddReadout(nn.Module):
@@ -25,7 +26,7 @@ class AddReadout(nn.Module):
             readout = (x[:, 0] + x[:, 1]) / 2
         else:
             readout = x[:, 0]
-        return x[:, self.start_index :] + readout.unsqueeze(1)
+        return x[:, self.start_index:] + readout.unsqueeze(1)
 
 
 class ProjectReadout(nn.Module):
@@ -36,8 +37,8 @@ class ProjectReadout(nn.Module):
         self.project = nn.Sequential(nn.Linear(2 * in_features, in_features), nn.GELU())
 
     def forward(self, x):
-        readout = x[:, 0].unsqueeze(1).expand_as(x[:, self.start_index :])
-        features = torch.cat((x[:, self.start_index :], readout), -1)
+        readout = x[:, 0].unsqueeze(1).expand_as(x[:, self.start_index:])
+        features = torch.cat((x[:, self.start_index:], readout), -1)
 
         return self.project(features)
 
@@ -89,10 +90,10 @@ def forward_vit(pretrained, x):
     if layer_4.ndim == 3:
         layer_4 = unflatten(layer_4)
 
-    layer_1 = pretrained.layer1[3 : len(pretrained.layer1)](layer_1)
-    layer_2 = pretrained.layer2[3 : len(pretrained.layer2)](layer_2)
-    layer_3 = pretrained.layer3[3 : len(pretrained.layer3)](layer_3)
-    layer_4 = pretrained.layer4[3 : len(pretrained.layer4)](layer_4)
+    layer_1 = pretrained.layer1[3: len(pretrained.layer1)](layer_1)
+    layer_2 = pretrained.layer2[3: len(pretrained.layer2)](layer_2)
+    layer_3 = pretrained.layer3[3: len(pretrained.layer3)](layer_3)
+    layer_4 = pretrained.layer4[3: len(pretrained.layer4)](layer_4)
 
     return layer_1, layer_2, layer_3, layer_4
 
@@ -100,7 +101,7 @@ def forward_vit(pretrained, x):
 def _resize_pos_embed(self, posemb, gs_h, gs_w):
     posemb_tok, posemb_grid = (
         posemb[:, : self.start_index],
-        posemb[0, self.start_index :],
+        posemb[0, self.start_index:],
     )
 
     gs_old = int(math.sqrt(len(posemb_grid)))
@@ -181,13 +182,13 @@ def get_readout_oper(vit_features, features, use_readout, start_index=1):
 
 
 def _make_vit_b16_backbone(
-    model,
-    features=[96, 192, 384, 768],
-    size=[384, 384],
-    hooks=[2, 5, 8, 11],
-    vit_features=768,
-    use_readout="ignore",
-    start_index=1,
+        model,
+        features=[96, 192, 384, 768],
+        size=[384, 384],
+        hooks=[2, 5, 8, 11],
+        vit_features=768,
+        use_readout="ignore",
+        start_index=1,
 ):
     pretrained = nn.Module()
 
@@ -341,14 +342,14 @@ def _make_pretrained_deitb16_distil_384(pretrained, use_readout="ignore", hooks=
 
 
 def _make_vit_b_rn50_backbone(
-    model,
-    features=[256, 512, 768, 768],
-    size=[384, 384],
-    hooks=[0, 1, 8, 11],
-    vit_features=768,
-    use_vit_only=False,
-    use_readout="ignore",
-    start_index=1,
+        model,
+        features=[256, 512, 768, 768],
+        size=[384, 384],
+        hooks=[0, 1, 8, 11],
+        vit_features=768,
+        use_vit_only=False,
+        use_readout="ignore",
+        start_index=1,
 ):
     pretrained = nn.Module()
 
@@ -476,7 +477,7 @@ def _make_vit_b_rn50_backbone(
 
 
 def _make_pretrained_vitb_rn50_384(
-    pretrained, use_readout="ignore", hooks=None, use_vit_only=False
+        pretrained, use_readout="ignore", hooks=None, use_vit_only=False
 ):
     model = timm.create_model("vit_base_resnet50_384", pretrained=pretrained)
 

@@ -1,10 +1,9 @@
-import torch
 import torch.nn as nn
-
-from feature_networks.vit import forward_vit
-from feature_networks.pretrained_builder import _make_pretrained
 from feature_networks.constants import NORMALIZED_INCEPTION, NORMALIZED_IMAGENET, NORMALIZED_CLIP, VITS
+from feature_networks.pretrained_builder import _make_pretrained
+from feature_networks.vit import forward_vit
 from pg_modules.blocks import FeatureFusionBlock
+
 
 def get_backbone_normstats(backbone):
     if backbone in NORMALIZED_INCEPTION:
@@ -27,9 +26,10 @@ def get_backbone_normstats(backbone):
     else:
         raise NotImplementedError
 
+
 def _make_scratch_ccm(scratch, in_channels, cout, expand=False):
     # shapes
-    out_channels = [cout, cout*2, cout*4, cout*8] if expand else [cout]*4
+    out_channels = [cout, cout * 2, cout * 4, cout * 8] if expand else [cout] * 4
 
     scratch.layer0_ccm = nn.Conv2d(in_channels[0], out_channels[0], kernel_size=1, stride=1, padding=0, bias=True)
     scratch.layer1_ccm = nn.Conv2d(in_channels[1], out_channels[1], kernel_size=1, stride=1, padding=0, bias=True)
@@ -40,6 +40,7 @@ def _make_scratch_ccm(scratch, in_channels, cout, expand=False):
 
     return scratch
 
+
 def _make_scratch_csm(scratch, in_channels, cout, expand):
     scratch.layer3_csm = FeatureFusionBlock(in_channels[3], nn.ReLU(False), expand=expand, lowest=True)
     scratch.layer2_csm = FeatureFusionBlock(in_channels[2], nn.ReLU(False), expand=expand)
@@ -47,9 +48,10 @@ def _make_scratch_csm(scratch, in_channels, cout, expand):
     scratch.layer0_csm = FeatureFusionBlock(in_channels[0], nn.ReLU(False))
 
     # last refinenet does not expand to save channels in higher dimensions
-    scratch.CHANNELS = [cout, cout, cout*2, cout*4] if expand else [cout]*4
+    scratch.CHANNELS = [cout, cout, cout * 2, cout * 4] if expand else [cout] * 4
 
     return scratch
+
 
 def _make_projector(im_res, backbone, cout, proj_type, expand=False):
     assert proj_type in [0, 1, 2], "Invalid projection type"
@@ -59,7 +61,7 @@ def _make_projector(im_res, backbone, cout, proj_type, expand=False):
 
     # Following Projected GAN
     im_res = 256
-    pretrained.RESOLUTIONS = [im_res//4, im_res//8, im_res//16, im_res//32]
+    pretrained.RESOLUTIONS = [im_res // 4, im_res // 8, im_res // 16, im_res // 32]
 
     if proj_type == 0: return pretrained, None
 
@@ -75,24 +77,26 @@ def _make_projector(im_res, backbone, cout, proj_type, expand=False):
     scratch = _make_scratch_csm(scratch, in_channels=scratch.CHANNELS, cout=cout, expand=expand)
 
     # CSM upsamples x2 so the feature map resolution doubles
-    pretrained.RESOLUTIONS = [res*2 for res in pretrained.RESOLUTIONS]
+    pretrained.RESOLUTIONS = [res * 2 for res in pretrained.RESOLUTIONS]
     pretrained.CHANNELS = scratch.CHANNELS
 
     return pretrained, scratch
+
 
 class F_Identity(nn.Module):
     def forward(self, x):
         return x
 
+
 class F_RandomProj(nn.Module):
     def __init__(
-        self,
-        backbone="tf_efficientnet_lite3",
-        im_res=256,
-        cout=64,
-        expand=True,
-        proj_type=2,  # 0 = no projection, 1 = cross channel mixing, 2 = cross scale mixing
-        **kwargs,
+            self,
+            backbone="tf_efficientnet_lite3",
+            im_res=256,
+            cout=64,
+            expand=True,
+            proj_type=2,  # 0 = no projection, 1 = cross channel mixing, 2 = cross scale mixing
+            **kwargs,
     ):
         super().__init__()
         self.proj_type = proj_type
@@ -110,16 +114,16 @@ class F_RandomProj(nn.Module):
     def forward(self, x):
         # predict feature maps
         if self.backbone in VITS:
-            out0, out1, out2, out3 = forward_vit(self.pretrained, x[:,:3])
-            if x.shape[1]==4:
-                tmp = forward_vit(self.pretrained, x[:,3:4].repeat(1,3,1,1))
+            out0, out1, out2, out3 = forward_vit(self.pretrained, x[:, :3])
+            if x.shape[1] == 4:
+                tmp = forward_vit(self.pretrained, x[:, 3:4].repeat(1, 3, 1, 1))
                 out0 += tmp[0]
                 out1 += tmp[1]
                 out2 += tmp[2]
                 out3 += tmp[3]
         else:
-            out0 = self.pretrained.layer0(x[:,:3])
-            if x.shape[1]==4: out0 += self.pretrained.layer0(x[:,3:4].repeat(1,3,1,1))
+            out0 = self.pretrained.layer0(x[:, :3])
+            if x.shape[1] == 4: out0 += self.pretrained.layer0(x[:, 3:4].repeat(1, 3, 1, 1))
             out1 = self.pretrained.layer1(out0)
             out2 = self.pretrained.layer2(out1)
             out3 = self.pretrained.layer3(out2)

@@ -4,27 +4,29 @@ Reimplemented and modified by Axel Sauer for "StyleGAN-XL: Scaling StyleGAN to L
 """
 import os
 import re
-import click
-import legacy
-from typing import List, Optional
-import PIL.Image
-import imageio
 from timeit import default_timer as timer
+from typing import List, Optional
 
-import dnnlib
+import PIL.Image
+import click
+import imageio
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torch_utils import gen_utils
-from metrics.metric_utils import get_feature_detector
+import dnnlib
+import legacy
 from feature_networks import clip
+from metrics.metric_utils import get_feature_detector
+from torch_utils import gen_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self, name, fmt=':f'):
         self.name = name
         self.fmt = fmt
@@ -83,12 +85,12 @@ def num_range(s: str) -> List[int]:
     range_re = re.compile(r'^(\d+)-(\d+)$')
     m = range_re.match(s)
     if m:
-        return list(range(int(m.group(1)), int(m.group(2))+1))
+        return list(range(int(m.group(1)), int(m.group(2)) + 1))
     vals = s.split(',')
     return [int(x) for x in vals]
 
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 
 def forward_synthesis(G, styles):
@@ -99,7 +101,7 @@ def forward_synthesis(G, styles):
 
     for idx, name in enumerate(G.synthesis.layer_names):
         block = getattr(G.synthesis, name)
-        s = styles[:, idx+1][:, :block.in_channels]
+        s = styles[:, idx + 1][:, :block.in_channels]
 
         # adjust block
         block.affine = nn.Identity()
@@ -131,27 +133,26 @@ def embed_text(model, prompt, device='cuda'):
     return model.encode_text(clip.tokenize(prompt).to(device)).float()
 
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 
 def generate_edit(
-    G,
-    styles,
-    direction,
-    edit_strength,
-    path,
-    save_video=True,
-    device='cuda',
+        G,
+        styles,
+        direction,
+        edit_strength,
+        path,
+        save_video=True,
+        device='cuda',
 ):
     time_start = timer()
 
     if save_video:
 
-        video_out = imageio.get_writer(path+'.mp4', mode='I', fps=60, codec='libx264')
-        for grad_change in np.arange(0, 1, 0.005)*edit_strength:
-
+        video_out = imageio.get_writer(path + '.mp4', mode='I', fps=60, codec='libx264')
+        for grad_change in np.arange(0, 1, 0.005) * edit_strength:
             with torch.no_grad():
-                img = forward_synthesis(G, styles + direction*grad_change)
+                img = forward_synthesis(G, styles + direction * grad_change)
 
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255)
             video_out.append_data(img[0].to(torch.uint8).cpu().numpy())
@@ -160,7 +161,7 @@ def generate_edit(
     else:
 
         imgs = []
-        grad_changes = [x*edit_strength for x in [0, 0.25, 0.5, 0.75, 1]]
+        grad_changes = [x * edit_strength for x in [0, 0.25, 0.5, 0.75, 1]]
 
         for i, grad_change in enumerate(grad_changes):
             with torch.no_grad():
@@ -174,14 +175,14 @@ def generate_edit(
 
 
 def find_direction(
-    G,
-    styles,
-    text_prompt,
-    layers,
-    seeds,
-    class_idx=None,
-    batch_size=8,
-    device='cuda',
+        G,
+        styles,
+        text_prompt,
+        layers,
+        seeds,
+        class_idx=None,
+        batch_size=8,
+        device='cuda',
 ):
     time_start = timer()
 
@@ -264,10 +265,10 @@ def w_s_converter(G, ws, device='cuda', unit_test=False):
     # synthesis layers
     for i, name in enumerate(G.synthesis.layer_names):
         block = getattr(G.synthesis, name)
-        w = ws[i+1]
+        w = ws[i + 1]
         style = block.affine(w)
         style_sz = style.shape[1]
-        styles[0, i+1:i+2, :style_sz] = style
+        styles[0, i + 1:i + 2, :style_sz] = style
 
     if unit_test:
         os.makedirs('unit_tests', exist_ok=True)
@@ -295,25 +296,25 @@ def w_s_converter(G, ws, device='cuda', unit_test=False):
 @click.option('--init-seed', help='Seed of in inital image', type=int)
 @click.option('--save-video', help='Save video of edit', is_flag=True)
 def stylemc(
-    ctx: click.Context,
-    network_pkl: str,
-    seeds: List[int],
-    layers: List[int],
-    text_prompt: str,
-    edit_strength: float,
-    outdir: str,
-    init_seed: Optional[int],
-    class_idx: Optional[int],
-    w_path: Optional[str],
-    save_video: Optional[bool],
-    bigger_network_pkl: Optional[str],
+        ctx: click.Context,
+        network_pkl: str,
+        seeds: List[int],
+        layers: List[int],
+        text_prompt: str,
+        edit_strength: float,
+        outdir: str,
+        init_seed: Optional[int],
+        class_idx: Optional[int],
+        w_path: Optional[str],
+        save_video: Optional[bool],
+        bigger_network_pkl: Optional[str],
 ):
-    assert not((w_path is None) and (init_seed is None)), "Provide either w-path or init-seed"
+    assert not ((w_path is None) and (init_seed is None)), "Provide either w-path or init-seed"
 
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
     with dnnlib.util.open_url(network_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
+        G = legacy.load_network_pkl(f)['G_ema'].to(device)  # type: ignore
 
     os.makedirs(outdir, exist_ok=True)
 
@@ -333,9 +334,8 @@ def stylemc(
 
     # generate edited images
     if bigger_network_pkl:
-
         with dnnlib.util.open_url(bigger_network_pkl) as f:
-            G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
+            G = legacy.load_network_pkl(f)['G_ema'].to(device)  # type: ignore
 
         # adjust styles
         w = w[:, 0].repeat(1, G.mapping.num_ws, 1)
@@ -343,11 +343,11 @@ def stylemc(
         padding = (0, 0, 0, init_styles.shape[1] - direction.shape[1])
         direction = F.pad(direction, padding, "constant", 0)
 
-
     text_prompt = text_prompt.replace(" ", "_")
     path = f'{outdir}/{text_prompt}_{edit_strength}'
     generate_edit(G, init_styles, direction, edit_strength=edit_strength, path=path,
                   save_video=save_video, device=device)
+
 
 if __name__ == "__main__":
     stylemc()

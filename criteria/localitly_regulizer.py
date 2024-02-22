@@ -1,7 +1,8 @@
-import torch
 import numpy as np
-from criteria import l2_loss
+import torch
+
 from configs import hyperparameters
+from criteria import l2_loss
 
 
 class Space_Regulizer:

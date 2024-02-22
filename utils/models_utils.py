@@ -1,6 +1,7 @@
 import pickle
-import functools
+
 import torch
+
 from configs import paths_config
 
 
@@ -18,7 +19,7 @@ def load_tuned_G(run_id, type, device):
     return new_G
 
 
-def load_network(path, device:torch.device):
+def load_network(path, device: torch.device):
     G = None
     with open(path, 'rb') as f:
         if path.endswith(".pkl"):

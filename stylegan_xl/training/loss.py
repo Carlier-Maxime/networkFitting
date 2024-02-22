@@ -12,27 +12,26 @@
 """Loss functions."""
 
 import numpy as np
+import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.transforms import Normalize
+from pg_modules.blocks import Interpolate
+from pg_modules.projector import get_backbone_normstats
 from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
-import dnnlib
-import legacy
+from torchvision.transforms import Normalize
 
-from pg_modules.blocks import Interpolate
-import timm
-from pg_modules.projector import get_backbone_normstats
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 class Loss:
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg): # to be overridden by subclass
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg):  # to be overridden by subclass
         raise NotImplementedError()
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class ProjectedGANLoss(Loss):
     def __init__(self, device, G, D, G_ema, blur_init_sigma=0, blur_fade_kimg=0,
@@ -110,7 +109,7 @@ class ProjectedGANLoss(Loss):
                 gen_logits = torch.cat(gen_logits)
 
                 if self.cls_weight:
-                    gen_img = self.norm(gen_img.add(1).div(2)) 
+                    gen_img = self.norm(gen_img.add(1).div(2))
                     guidance_loss = self.cls_guidance_loss(self.classifier(gen_img), gen_c.argmax(1))
                     loss_Gmain += self.cls_weight * guidance_loss
                     training_stats.report('Loss/G/guidance_loss', guidance_loss)

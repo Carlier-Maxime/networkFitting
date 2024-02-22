@@ -1,8 +1,8 @@
 import cv2
 import torch
+from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
-from PIL import Image
 
 from data_utils import make_dataset
 from replace_color import rgb2hsv

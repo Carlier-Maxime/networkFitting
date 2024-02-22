@@ -12,26 +12,27 @@ import re
 
 import dnnlib
 import imgui
-import numpy as np
 from gui_utils import imgui_utils
 
 from . import renderer
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def _locate_results(pattern):
     return pattern
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class PickleWidget:
     def __init__(self, viz):
-        self.viz            = viz
-        self.search_dirs    = []
-        self.cur_pkl        = None
-        self.user_pkl       = ''
-        self.recent_pkls    = []
-        self.browse_cache   = dict() # {tuple(path, ...): [dnnlib.EasyDict(), ...], ...}
+        self.viz = viz
+        self.search_dirs = []
+        self.cur_pkl = None
+        self.user_pkl = ''
+        self.recent_pkls = []
+        self.browse_cache = dict()  # {tuple(path, ...): [dnnlib.EasyDict(), ...], ...}
         self.browse_refocus = False
         self.load('', ignore_errors=True)
 
@@ -47,7 +48,7 @@ class PickleWidget:
     def load(self, pkl, ignore_errors=False):
         viz = self.viz
         viz.clear_result()
-        viz.skip_frame() # The input field will change on next frame.
+        viz.skip_frame()  # The input field will change on next frame.
         try:
             resolved = self.resolve_pkl(pkl)
             name = resolved.replace('\\', '/').split('/')[-1]
@@ -76,9 +77,9 @@ class PickleWidget:
             imgui.text('Pickle')
             imgui.same_line(viz.label_w)
             changed, self.user_pkl = imgui_utils.input_text('##pkl', self.user_pkl, 1024,
-                flags=(imgui.INPUT_TEXT_AUTO_SELECT_ALL | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE),
-                width=(-1 - viz.button_w * 2 - viz.spacing * 2),
-                help_text='<PATH> | <URL> | <RUN_DIR> | <RUN_ID> | <RUN_ID>/<KIMG>.pkl')
+                                                            flags=(imgui.INPUT_TEXT_AUTO_SELECT_ALL | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE),
+                                                            width=(-1 - viz.button_w * 2 - viz.spacing * 2),
+                                                            help_text='<PATH> | <URL> | <RUN_DIR> | <RUN_ID> | <RUN_ID>/<KIMG>.pkl')
             if changed:
                 self.load(self.user_pkl, ignore_errors=True)
             if imgui.is_item_hovered() and not imgui.is_item_active() and self.user_pkl != '':
@@ -117,10 +118,11 @@ class PickleWidget:
                 if len(items) == 0:
                     with imgui_utils.grayed_out():
                         imgui.menu_item('No results found')
+
             recurse(self.search_dirs)
             if self.browse_refocus:
                 imgui.set_scroll_here()
-                viz.skip_frame() # Focus will change on next frame.
+                viz.skip_frame()  # Focus will change on next frame.
                 self.browse_refocus = False
             imgui.end_popup()
 
@@ -167,4 +169,4 @@ class PickleWidget:
         path = os.path.abspath(path)
         return path
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

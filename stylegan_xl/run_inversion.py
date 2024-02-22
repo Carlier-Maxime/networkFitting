@@ -2,22 +2,23 @@
 
 import copy
 import os
+import sys
 from time import perf_counter
 
-import dill
+import PIL.Image
 import click
+import dill
 import imageio
 import numpy as np
-import PIL.Image
+import timm
 import torch
 import torch.nn.functional as F
-
 from tqdm import trange
+
 import dnnlib
 import legacy
 from metrics import metric_utils
-import timm
-import sys
+
 sys.path.append('.')
 from utils.replace_color import replaceOrPasteColor
 

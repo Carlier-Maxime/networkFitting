@@ -8,31 +8,33 @@
 
 """Streaming images and labels from datasets created with dataset_tool.py."""
 
-import os
-import numpy as np
-import zipfile
-import PIL.Image
-import json
-import torch
-import dnnlib
 import copy
+import json
+import os
+import zipfile
+
+import PIL.Image
+import dnnlib
+import numpy as np
+import torch
 
 try:
     import pyspng
 except ImportError:
     pyspng = None
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self,
-        name,                   # Name of the dataset.
-        raw_shape,              # Shape of the raw image data (NCHW).
-        max_size    = None,     # Artificially limit the size of the dataset. None = no limit. Applied before xflip.
-        use_labels  = False,    # Enable conditioning labels? False = label dimension is zero.
-        xflip       = False,    # Artificially double the size of the dataset via x-flips. Applied after max_size.
-        random_seed = 1,        # Random seed to use when applying max_size.
-    ):
+                 name,  # Name of the dataset.
+                 raw_shape,  # Shape of the raw image data (NCHW).
+                 max_size=None,  # Artificially limit the size of the dataset. None = no limit. Applied before xflip.
+                 use_labels=False,  # Enable conditioning labels? False = label dimension is zero.
+                 xflip=False,  # Artificially double the size of the dataset via x-flips. Applied after max_size.
+                 random_seed=1,  # Random seed to use when applying max_size.
+                 ):
         self._name = name
         self._raw_shape = list(raw_shape)
         self._use_labels = use_labels
@@ -77,13 +79,13 @@ class Dataset(torch.utils.data.Dataset):
                 assert np.all(self._raw_labels >= 0)
         return self._raw_labels
 
-    def close(self): # to be overridden by subclass
+    def close(self):  # to be overridden by subclass
         pass
 
-    def _load_raw_image(self, raw_idx): # to be overridden by subclass
+    def _load_raw_image(self, raw_idx):  # to be overridden by subclass
         raise NotImplementedError
 
-    def _load_raw_labels(self): # to be overridden by subclass
+    def _load_raw_labels(self):  # to be overridden by subclass
         raise NotImplementedError
 
     def __getstate__(self):
@@ -104,7 +106,7 @@ class Dataset(torch.utils.data.Dataset):
         assert list(image.shape) == self.image_shape
         assert image.dtype == np.uint8
         if self._xflip[idx]:
-            assert image.ndim == 3 # CHW
+            assert image.ndim == 3  # CHW
             image = image[:, :, ::-1]
         return image.copy(), self.get_label(idx)
 
@@ -133,12 +135,12 @@ class Dataset(torch.utils.data.Dataset):
 
     @property
     def num_channels(self):
-        assert len(self.image_shape) == 3 # CHW
+        assert len(self.image_shape) == 3  # CHW
         return self.image_shape[0]
 
     @property
     def resolution(self):
-        assert len(self.image_shape) == 3 # CHW
+        assert len(self.image_shape) == 3  # CHW
         assert self.image_shape[1] == self.image_shape[2]
         return self.image_shape[1]
 
@@ -165,14 +167,15 @@ class Dataset(torch.utils.data.Dataset):
     def has_onehot_labels(self):
         return self._get_raw_labels().dtype == np.int64
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class ImageFolderDataset(Dataset):
     def __init__(self,
-        path,                   # Path to directory or zip.
-        resolution      = None, # Ensure specific resolution, None = highest available.
-        **super_kwargs,         # Additional arguments for the Dataset base class.
-    ):
+                 path,  # Path to directory or zip.
+                 resolution=None,  # Ensure specific resolution, None = highest available.
+                 **super_kwargs,  # Additional arguments for the Dataset base class.
+                 ):
         self._path = path
         self._zipfile = None
 
@@ -231,8 +234,8 @@ class ImageFolderDataset(Dataset):
             else:
                 image = np.array(PIL.Image.open(f))
         if image.ndim == 2:
-            image = image[:, :, np.newaxis] # HW => HWC
-        image = image.transpose(2, 0, 1) # HWC => CHW
+            image = image[:, :, np.newaxis]  # HW => HWC
+        image = image.transpose(2, 0, 1)  # HWC => CHW
         return image
 
     def _load_raw_labels(self):
@@ -249,4 +252,4 @@ class ImageFolderDataset(Dataset):
         labels = labels.astype({1: np.int64, 2: np.float32}[labels.ndim])
         return labels
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

@@ -1,15 +1,16 @@
+import pickle
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.transforms import Normalize
-import pickle
-
-from training.diffaug import DiffAugment
-from training.networks_stylegan2 import FullyConnectedLayer
+from feature_networks.constants import VITS
 from pg_modules.blocks import conv2d, DownBlock, DownBlockPatch
 from pg_modules.projector import F_RandomProj
-from feature_networks.constants import VITS
+from torchvision.transforms import Normalize
+from training.diffaug import DiffAugment
+from training.networks_stylegan2 import FullyConnectedLayer
+
 
 class SingleDisc(nn.Module):
     def __init__(self, nc=None, ndf=None, start_sz=256, end_sz=8, head=None, patch=False):
@@ -46,7 +47,7 @@ class SingleDisc(nn.Module):
         # Down Blocks
         DB = DownBlockPatch if patch else DownBlock
         while start_sz > end_sz:
-            layers.append(DB(nfc[start_sz], nfc[start_sz//2]))
+            layers.append(DB(nfc[start_sz], nfc[start_sz // 2]))
             start_sz = start_sz // 2
 
         layers.append(conv2d(nfc[end_sz], 1, 4, 1, 0, bias=False))
@@ -54,6 +55,7 @@ class SingleDisc(nn.Module):
 
     def forward(self, x, c):
         return self.main(x)
+
 
 class SingleDiscCond(nn.Module):
     def __init__(self, nc=None, ndf=None, start_sz=256, end_sz=8, head=None, patch=False, c_dim=1000, cmap_dim=64, rand_embedding=False):
@@ -91,7 +93,7 @@ class SingleDiscCond(nn.Module):
         # Down Blocks
         DB = DownBlockPatch if patch else DownBlock
         while start_sz > end_sz:
-            layers.append(DB(nfc[start_sz],  nfc[start_sz//2]))
+            layers.append(DB(nfc[start_sz], nfc[start_sz // 2]))
             start_sz = start_sz // 2
         self.main = nn.Sequential(*layers)
 
@@ -117,16 +119,17 @@ class SingleDiscCond(nn.Module):
 
         return out
 
+
 class MultiScaleD(nn.Module):
     def __init__(
-        self,
-        channels,
-        resolutions,
-        num_discs=4,
-        proj_type=2,  # 0 = no projection, 1 = cross channel mixing, 2 = cross scale mixing
-        cond=0,
-        patch=False,
-        **kwargs,
+            self,
+            channels,
+            resolutions,
+            num_discs=4,
+            proj_type=2,  # 0 = no projection, 1 = cross channel mixing, 2 = cross scale mixing
+            cond=0,
+            patch=False,
+            **kwargs,
     ):
         super().__init__()
 
@@ -152,14 +155,15 @@ class MultiScaleD(nn.Module):
         all_logits = torch.cat(all_logits, dim=1)
         return all_logits
 
+
 class ProjectedDiscriminator(torch.nn.Module):
     def __init__(
-        self,
-        backbones,
-        diffaug=True,
-        interp224=True,
-        backbone_kwargs={},
-        **kwargs
+            self,
+            backbones,
+            diffaug=True,
+            interp224=True,
+            backbone_kwargs={},
+            **kwargs
     ):
         super().__init__()
         self.backbones = backbones
@@ -170,7 +174,6 @@ class ProjectedDiscriminator(torch.nn.Module):
         feature_networks, discriminators = [], []
 
         for i, bb_name in enumerate(backbones):
-
             feat = F_RandomProj(bb_name, **backbone_kwargs)
             disc = MultiScaleD(
                 channels=feat.CHANNELS,

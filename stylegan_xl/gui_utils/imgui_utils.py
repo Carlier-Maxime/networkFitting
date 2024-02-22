@@ -7,36 +7,39 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import contextlib
+
 import imgui
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def set_default_style(color_scheme='dark', spacing=9, indent=23, scrollbar=27):
     s = imgui.get_style()
-    s.window_padding        = [spacing, spacing]
-    s.item_spacing          = [spacing, spacing]
-    s.item_inner_spacing    = [spacing, spacing]
-    s.columns_min_spacing   = spacing
-    s.indent_spacing        = indent
-    s.scrollbar_size        = scrollbar
-    s.frame_padding         = [4, 3]
-    s.window_border_size    = 1
-    s.child_border_size     = 1
-    s.popup_border_size     = 1
-    s.frame_border_size     = 1
-    s.window_rounding       = 0
-    s.child_rounding        = 0
-    s.popup_rounding        = 3
-    s.frame_rounding        = 3
-    s.scrollbar_rounding    = 3
-    s.grab_rounding         = 3
+    s.window_padding = [spacing, spacing]
+    s.item_spacing = [spacing, spacing]
+    s.item_inner_spacing = [spacing, spacing]
+    s.columns_min_spacing = spacing
+    s.indent_spacing = indent
+    s.scrollbar_size = scrollbar
+    s.frame_padding = [4, 3]
+    s.window_border_size = 1
+    s.child_border_size = 1
+    s.popup_border_size = 1
+    s.frame_border_size = 1
+    s.window_rounding = 0
+    s.child_rounding = 0
+    s.popup_rounding = 3
+    s.frame_rounding = 3
+    s.scrollbar_rounding = 3
+    s.grab_rounding = 3
 
     getattr(imgui, f'style_colors_{color_scheme}')(s)
     c0 = s.colors[imgui.COLOR_MENUBAR_BACKGROUND]
     c1 = s.colors[imgui.COLOR_FRAME_BACKGROUND]
     s.colors[imgui.COLOR_POPUP_BACKGROUND] = [x * 0.7 + y * 0.3 for x, y in zip(c0, c1)][:3] + [1]
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @contextlib.contextmanager
 def grayed_out(cond=True):
@@ -64,7 +67,8 @@ def grayed_out(cond=True):
     else:
         yield
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @contextlib.contextmanager
 def item_width(width=None):
@@ -75,7 +79,8 @@ def item_width(width=None):
     else:
         yield
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def scoped_by_object_id(method):
     def decorator(self, *args, **kwargs):
@@ -83,9 +88,11 @@ def scoped_by_object_id(method):
         res = method(self, *args, **kwargs)
         imgui.pop_id()
         return res
+
     return decorator
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def button(label, width=0, enabled=True):
     with grayed_out(not enabled):
@@ -93,7 +100,8 @@ def button(label, width=0, enabled=True):
     clicked = clicked and enabled
     return clicked
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def collapsing_header(text, visible=None, flags=0, default=False, enabled=True, show=True):
     expanded = False
@@ -107,7 +115,8 @@ def collapsing_header(text, visible=None, flags=0, default=False, enabled=True, 
         expanded = expanded and enabled
     return expanded, visible
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def popup_button(label, width=0, enabled=True):
     if button(label, width, enabled):
@@ -115,7 +124,8 @@ def popup_button(label, width=0, enabled=True):
     opened = imgui.begin_popup(label)
     return opened
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def input_text(label, value, buffer_length, flags, width=None, help_text=''):
     old_value = value
@@ -132,7 +142,8 @@ def input_text(label, value, buffer_length, flags, width=None, help_text=''):
         changed = (value != old_value)
     return changed, value
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def drag_previous_control(enabled=True):
     dragging = False
@@ -146,14 +157,16 @@ def drag_previous_control(enabled=True):
         imgui.end_drag_drop_source()
     return dragging, dx, dy
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def drag_button(label, width=0, enabled=True):
     clicked = button(label, width=width, enabled=enabled)
     dragging, dx, dy = drag_previous_control(enabled=enabled)
     return clicked, dragging, dx, dy
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def drag_hidden_window(label, x, y, width, height, enabled=True):
     imgui.push_style_color(imgui.COLOR_WINDOW_BACKGROUND, 0, 0, 0, 0)
@@ -166,4 +179,4 @@ def drag_hidden_window(label, x, y, width, height, enabled=True):
     imgui.pop_style_color(2)
     return dragging, dx, dy
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

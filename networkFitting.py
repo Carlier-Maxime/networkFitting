@@ -1,9 +1,14 @@
-import click, torch, os
-from time import perf_counter
-from torch.utils.data import DataLoader
-from stylegan_xl import dnnlib
 import sys
-sys.path.insert(1,'stylegan_xl')
+from time import perf_counter
+
+import click
+import os
+import torch
+from torch.utils.data import DataLoader
+
+from stylegan_xl import dnnlib
+
+sys.path.insert(1, 'stylegan_xl')
 from torch_utils.ops import filtered_lrelu, bias_act, upfirdn2d
 
 from utils.ImagesDataset import ImagesDataset
@@ -12,13 +17,16 @@ from coaches.single_id_coach import SingleIDCoach
 from utils.models_utils import load_network
 
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
-def initPlugins(verbose:bool=True):
+
+def initPlugins(verbose: bool = True):
     verbosity = 'brief' if verbose else 'none'
     bias_act._init(verbosity)
     filtered_lrelu._init(verbosity)
     upfirdn2d._init(verbosity)
+
 
 def fitting(**kwargs):
     start_time = perf_counter()
@@ -36,20 +44,24 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    if opts.coache == "multi": coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
-    elif opts.coache == "single": coache = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
-    else: raise TypeError("a type of coache is incorrect")
+    if opts.coache == "multi":
+        coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
+    elif opts.coache == "single":
+        coache = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
+    else:
+        raise TypeError("a type of coache is incorrect")
     color = opts.color[1:-1].split(',')
-    for i in range(len(color)): color[i]=float(color[i])
+    for i in range(len(color)): color[i] = float(color[i])
     color = torch.tensor(color).to(device)
-    try: epsilon=float(opts.epsilon)
+    try:
+        epsilon = float(opts.epsilon)
     except:
-        epsilon=opts.epsilon[1:-1].split(',')
-        for i in range(len(epsilon)): epsilon[i]=float(epsilon[i])
+        epsilon = opts.epsilon[1:-1].split(',')
+        for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
     coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps, opts.max_images, opts.paste_color, color, epsilon, opts.save_img_step)
-    if opts.verbose : print(f'Elapsed time: {(perf_counter()-start_time):.1f} s')
-    
+    if opts.verbose: print(f'Elapsed time: {(perf_counter() - start_time):.1f} s')
+
 
 @click.command()
 @click.option('--network', 'network_path', help='Network file (support pickle (.pkl) and torch (.pt))', required=True)
@@ -72,10 +84,11 @@ def fitting(**kwargs):
 @click.option('--epsilon', help='a epsilon used for paste color', default='[150,100,150]')
 @click.option('--save-img-step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
 @click.option('--coache', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
-@click.option('--img-mode', type=click.Choice(["auto","RGB","RGBA"]), default='auto', help="choice mode for loading image")
+@click.option('--img-mode', type=click.Choice(["auto", "RGB", "RGBA"]), default='auto', help="choice mode for loading image")
 @click.option('--load-w-pivot', type=bool, default=False, help="enable load w_pivot by file in outdir", is_flag=True)
 def main(**kwargs):
     fitting(**kwargs)
+
 
 if __name__ == "__main__":
     main()

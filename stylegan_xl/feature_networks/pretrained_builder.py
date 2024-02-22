@@ -1,15 +1,12 @@
 import numpy as np
+import timm
 import torch
 import torch.nn as nn
 import torchvision.models as zoomodels
-from torch.autograd import Function
-
-import timm
-
 from feature_networks import clip
-from feature_networks.vit import _make_vit_b16_backbone, forward_vit
 from feature_networks.constants import ALL_MODELS, VITS, EFFNETS, REGNETS
-from pg_modules.blocks import Interpolate
+from feature_networks.vit import _make_vit_b16_backbone, forward_vit
+
 
 def _feature_splitter(model, idcs):
     pretrained = nn.Module()
@@ -18,6 +15,7 @@ def _feature_splitter(model, idcs):
     pretrained.layer2 = nn.Sequential(model.features[idcs[1]:idcs[2]])
     pretrained.layer3 = nn.Sequential(model.features[idcs[2]:idcs[3]])
     return pretrained
+
 
 def _make_resnet(model):
     pretrained = nn.Module()
@@ -29,6 +27,7 @@ def _make_resnet(model):
     pretrained.layer3 = model.layer4
     return pretrained
 
+
 def _make_regnet(model):
     pretrained = nn.Module()
     pretrained.layer0 = nn.Sequential(
@@ -38,6 +37,7 @@ def _make_regnet(model):
     pretrained.layer2 = model.s3
     pretrained.layer3 = model.s4
     return pretrained
+
 
 def _make_nfnet(model):
     pretrained = nn.Module()
@@ -49,6 +49,7 @@ def _make_nfnet(model):
     pretrained.layer3 = model.stages[3]
     return pretrained
 
+
 def _make_resnet_v2(model):
     pretrained = nn.Module()
     pretrained.layer0 = nn.Sequential(model.stem, model.stages[0])
@@ -56,6 +57,7 @@ def _make_resnet_v2(model):
     pretrained.layer2 = model.stages[2]
     pretrained.layer3 = model.stages[3]
     return pretrained
+
 
 def _make_resnet_clip(model):
     pretrained = nn.Module()
@@ -81,6 +83,7 @@ def _make_resnet_clip(model):
 
     return pretrained
 
+
 def _make_densenet(model):
     pretrained = nn.Module()
 
@@ -99,6 +102,7 @@ def _make_densenet(model):
 
     return pretrained
 
+
 def _make_shufflenet(model):
     pretrained = nn.Module()
     pretrained.layer0 = nn.Sequential(model.conv1, model.maxpool)
@@ -107,6 +111,7 @@ def _make_shufflenet(model):
     pretrained.layer3 = model.stage4
     return pretrained
 
+
 def _make_cspresnet(model):
     pretrained = nn.Module()
     pretrained.layer0 = nn.Sequential(model.stem, model.stages[0])
@@ -114,6 +119,7 @@ def _make_cspresnet(model):
     pretrained.layer2 = model.stages[2]
     pretrained.layer3 = model.stages[3]
     return pretrained
+
 
 def _make_efficientnet(model):
     pretrained = nn.Module()
@@ -125,6 +131,7 @@ def _make_efficientnet(model):
     pretrained.layer3 = nn.Sequential(*model.blocks[5:9])
     return pretrained
 
+
 def _make_ghostnet(model):
     pretrained = nn.Module()
     pretrained.layer0 = nn.Sequential(
@@ -134,6 +141,7 @@ def _make_ghostnet(model):
     pretrained.layer2 = nn.Sequential(*model.blocks[5:7])
     pretrained.layer3 = nn.Sequential(*model.blocks[7:-1])
     return pretrained
+
 
 def _make_vit(model, name):
     if 'tiny' in name:
@@ -168,6 +176,7 @@ def _make_vit(model, name):
         start_index=2 if 'deit' in name else 1,
     )
 
+
 def calc_dims(pretrained, is_vit=False):
     dims = []
     inp_res = 256
@@ -191,6 +200,7 @@ def calc_dims(pretrained, is_vit=False):
     channels = dims[:, 0]
     res_mult = dims[:, 1] / inp_res
     return channels, res_mult
+
 
 def _make_pretrained(backbone, verbose=False):
     assert backbone in ALL_MODELS
@@ -412,6 +422,6 @@ def _make_pretrained(backbone, verbose=False):
         print(f"Succesfully loaded:    {backbone}")
         print(f"Channels:              {pretrained.CHANNELS}")
         print(f"Resolution Multiplier: {pretrained.RES_MULT}")
-        print(f"Out Res for 256      : {pretrained.RES_MULT*256}")
+        print(f"Out Res for 256      : {pretrained.RES_MULT * 256}")
 
     return pretrained

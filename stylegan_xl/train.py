@@ -9,22 +9,24 @@
 """Train a GAN using the techniques described in the paper
 "Alias-Free Generative Adversarial Networks"."""
 
-import os
-import click
-import re
 import json
+import os
+import re
 import tempfile
+
+import click
 import torch
-import legacy
 
 import dnnlib
-from training import training_loop
+import legacy
 from metrics import metric_main
-from torch_utils import training_stats
 from torch_utils import custom_ops
 from torch_utils import misc
+from torch_utils import training_stats
+from training import training_loop
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def subprocess_fn(rank, c, temp_dir):
     dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
@@ -48,7 +50,8 @@ def subprocess_fn(rank, c, temp_dir):
     # Execute training loop.
     training_loop.training_loop(rank=rank, **c)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def launch_training(c, desc, outdir, dry_run):
     dnnlib.util.Logger(should_flush=True)
@@ -62,7 +65,7 @@ def launch_training(c, desc, outdir, dry_run):
     if c.restart_every > 0 and len(matching_dirs) > 0:  # expect unique desc, continue in this directory
         assert len(matching_dirs) == 1, f'Multiple directories found for resuming: {matching_dirs}'
         c.run_dir = os.path.join(outdir, matching_dirs[0].group())
-    else:                     # fallback to standard
+    else:  # fallback to standard
         prev_run_ids = [re.match(r'^\d+', x) for x in prev_run_dirs]
         prev_run_ids = [int(x.group()) for x in prev_run_ids if x is not None]
         cur_run_id = max(prev_run_ids, default=-1) + 1
@@ -105,20 +108,22 @@ def launch_training(c, desc, outdir, dry_run):
         else:
             torch.multiprocessing.spawn(fn=subprocess_fn, args=(c, temp_dir), nprocs=c.num_gpus)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def init_dataset_kwargs(data):
     try:
         dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
-        dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs) # Subclass of training.dataset.Dataset.
-        dataset_kwargs.resolution = dataset_obj.resolution # Be explicit about resolution.
-        dataset_kwargs.use_labels = dataset_obj.has_labels # Be explicit about labels.
-        dataset_kwargs.max_size = len(dataset_obj) # Be explicit about dataset size.
+        dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs)  # Subclass of training.dataset.Dataset.
+        dataset_kwargs.resolution = dataset_obj.resolution  # Be explicit about resolution.
+        dataset_kwargs.use_labels = dataset_obj.has_labels  # Be explicit about labels.
+        dataset_kwargs.max_size = len(dataset_obj)  # Be explicit about dataset size.
         return dataset_kwargs, dataset_obj.name
     except IOError as err:
         raise click.ClickException(f'--data: {err}')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_comma_separated_list(s):
     if isinstance(s, list):
@@ -127,53 +132,48 @@ def parse_comma_separated_list(s):
         return []
     return s.split(',')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @click.command()
-
 # Required.
-@click.option('--outdir',       help='Where to save the results', metavar='DIR',                required=True)
-@click.option('--cfg',          help='Base configuration',                                      type=click.Choice(['stylegan3-t', 'stylegan3-r', 'stylegan2', 'fastgan']), required=True)
-@click.option('--data',         help='Training data', metavar='[ZIP|DIR]',                      type=str, required=True)
-@click.option('--gpus',         help='Number of GPUs to use', metavar='INT',                    type=click.IntRange(min=1), required=True)
-@click.option('--batch',        help='Total batch size', metavar='INT',                         type=click.IntRange(min=1), required=True)
-
+@click.option('--outdir', help='Where to save the results', metavar='DIR', required=True)
+@click.option('--cfg', help='Base configuration', type=click.Choice(['stylegan3-t', 'stylegan3-r', 'stylegan2', 'fastgan']), required=True)
+@click.option('--data', help='Training data', metavar='[ZIP|DIR]', type=str, required=True)
+@click.option('--gpus', help='Number of GPUs to use', metavar='INT', type=click.IntRange(min=1), required=True)
+@click.option('--batch', help='Total batch size', metavar='INT', type=click.IntRange(min=1), required=True)
 # Optional features.
-@click.option('--cond',         help='Train conditional model', metavar='BOOL',                 type=bool, default=False, show_default=True)
-@click.option('--mirror',       help='Enable dataset x-flips', metavar='BOOL',                  type=bool, default=False, show_default=True)
-@click.option('--resume',       help='Resume from given network pickle', metavar='[PATH|URL]',  type=str)
-@click.option('--freezed',      help='Freeze first layers of D', metavar='INT',                 type=click.IntRange(min=0), default=0, show_default=True)
-
+@click.option('--cond', help='Train conditional model', metavar='BOOL', type=bool, default=False, show_default=True)
+@click.option('--mirror', help='Enable dataset x-flips', metavar='BOOL', type=bool, default=False, show_default=True)
+@click.option('--resume', help='Resume from given network pickle', metavar='[PATH|URL]', type=str)
+@click.option('--freezed', help='Freeze first layers of D', metavar='INT', type=click.IntRange(min=0), default=0, show_default=True)
 # Misc hyperparameters.
-@click.option('--batch-gpu',    help='Limit batch size per GPU', metavar='INT',                 type=click.IntRange(min=1))
-@click.option('--cbase',        help='Capacity multiplier', metavar='INT',                      type=click.IntRange(min=1), default=32768, show_default=True)
-@click.option('--cmax',         help='Max. feature maps', metavar='INT',                        type=click.IntRange(min=1), default=512, show_default=True)
-@click.option('--glr',          help='G learning rate  [default: varies]', metavar='FLOAT',     type=click.FloatRange(min=0))
-@click.option('--dlr',          help='D learning rate', metavar='FLOAT',                        type=click.FloatRange(min=0), default=0.002, show_default=True)
-@click.option('--map-depth',    help='Mapping network depth  [default: varies]', metavar='INT', type=click.IntRange(min=1))
-
+@click.option('--batch-gpu', help='Limit batch size per GPU', metavar='INT', type=click.IntRange(min=1))
+@click.option('--cbase', help='Capacity multiplier', metavar='INT', type=click.IntRange(min=1), default=32768, show_default=True)
+@click.option('--cmax', help='Max. feature maps', metavar='INT', type=click.IntRange(min=1), default=512, show_default=True)
+@click.option('--glr', help='G learning rate  [default: varies]', metavar='FLOAT', type=click.FloatRange(min=0))
+@click.option('--dlr', help='D learning rate', metavar='FLOAT', type=click.FloatRange(min=0), default=0.002, show_default=True)
+@click.option('--map-depth', help='Mapping network depth  [default: varies]', metavar='INT', type=click.IntRange(min=1))
 # Misc settings.
-@click.option('--desc',         help='String to include in result dir name', metavar='STR',     type=str)
-@click.option('--metrics',      help='Quality metrics', metavar='[NAME|A,B,C|none]',            type=parse_comma_separated_list, default='fid50k_full', show_default=True)
-@click.option('--kimg',         help='Total training duration', metavar='KIMG',                 type=click.IntRange(min=1), default=25000, show_default=True)
-@click.option('--tick',         help='How often to print progress', metavar='KIMG',             type=click.IntRange(min=1), default=4, show_default=True)
-@click.option('--snap',         help='How often to save snapshots', metavar='TICKS',            type=click.IntRange(min=1), default=50, show_default=True)
-@click.option('--seed',         help='Random seed', metavar='INT',                              type=click.IntRange(min=0), default=0, show_default=True)
-@click.option('--fp32',         help='Disable mixed-precision', metavar='BOOL',                 type=bool, default=False, show_default=True)
-@click.option('--nobench',      help='Disable cuDNN benchmarking', metavar='BOOL',              type=bool, default=False, show_default=True)
-@click.option('--workers',      help='DataLoader worker processes', metavar='INT',              type=click.IntRange(min=1), default=3, show_default=True)
-@click.option('-n','--dry-run', help='Print training options and exit',                         is_flag=True)
-
+@click.option('--desc', help='String to include in result dir name', metavar='STR', type=str)
+@click.option('--metrics', help='Quality metrics', metavar='[NAME|A,B,C|none]', type=parse_comma_separated_list, default='fid50k_full', show_default=True)
+@click.option('--kimg', help='Total training duration', metavar='KIMG', type=click.IntRange(min=1), default=25000, show_default=True)
+@click.option('--tick', help='How often to print progress', metavar='KIMG', type=click.IntRange(min=1), default=4, show_default=True)
+@click.option('--snap', help='How often to save snapshots', metavar='TICKS', type=click.IntRange(min=1), default=50, show_default=True)
+@click.option('--seed', help='Random seed', metavar='INT', type=click.IntRange(min=0), default=0, show_default=True)
+@click.option('--fp32', help='Disable mixed-precision', metavar='BOOL', type=bool, default=False, show_default=True)
+@click.option('--nobench', help='Disable cuDNN benchmarking', metavar='BOOL', type=bool, default=False, show_default=True)
+@click.option('--workers', help='DataLoader worker processes', metavar='INT', type=click.IntRange(min=1), default=3, show_default=True)
+@click.option('-n', '--dry-run', help='Print training options and exit', is_flag=True)
 # StyleGAN-XL additions
-@click.option('--restart_every',help='Time interval in seconds to restart code', metavar='INT', type=int, default=999999999, show_default=True)
-@click.option('--stem',         help='Train the stem.', is_flag=True)
-@click.option('--syn_layers',   help='Number of layers in the stem', type=click.IntRange(min=1), default=14, show_default=True)
-@click.option('--superres',     help='Train superresolution stage. You have to provide the path to a pretrained stem.', is_flag=True)
-@click.option('--path_stem',    help='Path to pretrained stem',  type=str)
-@click.option('--head_layers',  help='Layers of added superresolution head.', type=click.IntRange(min=1), default=7, show_default=True)
-@click.option('--cls_weight',   help='class guidance weight', type=float, default=0.0, show_default=True)
-@click.option('--up_factor',    help='Up sampling factor of superres head', type=click.IntRange(min=2), default=2, show_default=True)
-
+@click.option('--restart_every', help='Time interval in seconds to restart code', metavar='INT', type=int, default=999999999, show_default=True)
+@click.option('--stem', help='Train the stem.', is_flag=True)
+@click.option('--syn_layers', help='Number of layers in the stem', type=click.IntRange(min=1), default=14, show_default=True)
+@click.option('--superres', help='Train superresolution stage. You have to provide the path to a pretrained stem.', is_flag=True)
+@click.option('--path_stem', help='Path to pretrained stem', type=str)
+@click.option('--head_layers', help='Layers of added superresolution head.', type=click.IntRange(min=1), default=7, show_default=True)
+@click.option('--cls_weight', help='class guidance weight', type=float, default=0.0, show_default=True)
+@click.option('--up_factor', help='Up sampling factor of superres head', type=click.IntRange(min=2), default=2, show_default=True)
 def main(**kwargs):
     # Initialize config.
     opts = dnnlib.EasyDict(kwargs)  # Command line arguments
@@ -218,7 +218,7 @@ def main(**kwargs):
     if opts.cfg == 'stylegan2':
         c.G_kwargs.class_name = 'training.networks_stylegan2.Generator'
         c.G_reg_interval = 4  # Enable lazy regularization for G.
-        c.G_kwargs.fused_modconv_default = 'inference_only' # Speed up training by using regular convolutions instead of grouped convolutions.
+        c.G_kwargs.fused_modconv_default = 'inference_only'  # Speed up training by using regular convolutions instead of grouped convolutions.
 
     elif opts.cfg == 'fastgan':
         c.G_kwargs = dnnlib.EasyDict(class_name='training.networks_fastgan.Generator',
@@ -232,7 +232,7 @@ def main(**kwargs):
         c.G_kwargs.class_name = 'training.networks_stylegan3_resetting.Generator'
         c.G_kwargs.magnitude_ema_beta = 0.5 ** (c.batch_size / (20 * 1e3))
         c.G_kwargs.channel_base *= 2  # increase for StyleGAN-XL
-        c.G_kwargs.channel_max *= 2   # increase for StyleGAN-XL
+        c.G_kwargs.channel_max *= 2  # increase for StyleGAN-XL
         c.G_kwargs.conv_kernel = 1 if opts.cfg == 'stylegan3-r' else 3
         c.G_kwargs.use_radial_filters = True if opts.cfg == 'stylegan3-r' else False
 
@@ -326,13 +326,14 @@ def main(**kwargs):
         # get current number of training images
         with dnnlib.util.open_url(last_snapshot) as f:
             cur_nimg = legacy.load_network_pkl(f)['progress']['cur_nimg'].item()
-        if (cur_nimg//1000) < c.total_kimg:
+        if (cur_nimg // 1000) < c.total_kimg:
             print('Restart: exit with code 3')
             exit(3)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
     main()  # pylint: disable=no-value-for-parameter
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
