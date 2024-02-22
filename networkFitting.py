@@ -44,12 +44,12 @@ def fitting(**kwargs):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
-    if opts.coache == "multi":
-        coache = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
-    elif opts.coache == "single":
-        coache = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
+    if opts.coach == "multi":
+        coach = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
+    elif opts.coach == "single":
+        coach = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
     else:
-        raise TypeError("a type of coache is incorrect")
+        raise TypeError("a type of coach is incorrect")
     color = opts.color[1:-1].split(',')
     for i in range(len(color)): color[i] = float(color[i])
     color = torch.tensor(color).to(device)
@@ -59,7 +59,7 @@ def fitting(**kwargs):
         epsilon = opts.epsilon[1:-1].split(',')
         for i in range(len(epsilon)): epsilon[i] = float(epsilon[i])
         epsilon = torch.tensor(epsilon).to(device)
-    coache.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps, opts.max_images, opts.paste_color, color, epsilon, opts.save_img_step)
+    coach.train(opts.first_inv_steps, opts.inv_steps, opts.pti_steps, opts.max_images, opts.paste_color, color, epsilon, opts.save_img_step)
     if opts.verbose: print(f'Elapsed time: {(perf_counter() - start_time):.1f} s')
 
 
@@ -83,7 +83,7 @@ def fitting(**kwargs):
 @click.option('--color', help='color used for paste color', default='[0,255,0]')
 @click.option('--epsilon', help='a epsilon used for paste color', default='[150,100,150]')
 @click.option('--save-img-step', help='save a image step (Warning: increase step duration)', default=False, type=bool, is_flag=True)
-@click.option('--coache', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
+@click.option('--coach', type=click.Choice(["multi", "single"], case_sensitive=False), default="single")
 @click.option('--img-mode', type=click.Choice(["auto", "RGB", "RGBA"]), default='auto', help="choice mode for loading image")
 @click.option('--load-w-pivot', type=bool, default=False, help="enable load w_pivot by file in outdir", is_flag=True)
 def main(**kwargs):
