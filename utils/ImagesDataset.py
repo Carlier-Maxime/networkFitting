@@ -4,8 +4,8 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 
-from data_utils import make_dataset
-from replace_color import rgb2hsv
+from .data_utils import make_dataset
+from .replace_color import rgb2hsv
 
 
 class ImagesDataset(Dataset):
