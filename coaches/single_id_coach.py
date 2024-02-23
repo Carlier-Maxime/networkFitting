@@ -8,8 +8,8 @@ from configs import hyperparameters
 
 class SingleIDCoach(BaseCoach):
 
-    def __init__(self, device: torch.device, data_loader, network_path, outdir: str = 'out', save_latent: bool = False, save_video_latent: bool = False, save_video_pti: bool = False, save_img_result: bool = False, seed: int = 64, G=None, verbose: bool = True, load_w_pivot: bool = False):
-        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose, load_w_pivot)
+    def __init__(self, device: torch.device, data_loader, network_path, outdir: str = 'out', save_latent: bool = False, save_video_latent: bool = False, save_video_pti: bool = False, save_img_result: bool = False, seed: int = 64, G=None, verbose: bool = True, load_w_pivot: bool = False, save_layer: str = None):
+        super().__init__(device, data_loader, network_path, outdir, save_latent, save_video_latent, save_video_pti, save_img_result, seed, G, verbose, load_w_pivot, save_layer)
 
     def train(self, first_inv_steps: int = 1000, inv_steps: int = 100, pti_steps: int = 500, max_images: int = -1, paste_color: bool = False, color: torch.Tensor = torch.tensor([-1., 1., -1.]), epsilon=1.0, save_img_step: bool = False):
         use_ball_holder = True

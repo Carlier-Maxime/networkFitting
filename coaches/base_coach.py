@@ -13,10 +13,11 @@ from criteria.localitly_regulizer import Space_Regulizer
 from stylegan_xl.run_inversion import project
 from stylegan_xl.torch_utils import gen_utils
 from utils.models_utils import toogle_grad, load_network
+from stylegan_xl.viz.renderer import Renderer
 
 
 class BaseCoach:
-    def __init__(self, device: torch.device, data_loader, network_path, outdir, save_latent: bool = False, save_video_latent: bool = False, save_video_pti: bool = False, save_img_result: bool = False, seed: int = 64, G=None, verbose: bool = True, load_w_pivot: bool = False):
+    def __init__(self, device: torch.device, data_loader, network_path, outdir, save_latent: bool = False, save_video_latent: bool = False, save_video_pti: bool = False, save_img_result: bool = False, seed: int = 64, G=None, verbose: bool = True, load_w_pivot: bool = False, save_layer: str = None):
         self.device = device
         self.data_loader = data_loader
         self.network_path = network_path
@@ -33,6 +34,7 @@ class BaseCoach:
         self.w_seed = gen_utils.get_w_from_seed(self.G, 1, device, seed=seed)
         self.verbose = verbose
         self.load_w_pivot = load_w_pivot
+        self._save_layer = save_layer
         os.makedirs(self.outdir, exist_ok=True)
 
     def restart_training(self, G=None):
@@ -54,6 +56,7 @@ class BaseCoach:
             if self.save_video_latent:
                 self.video_append(self.videoOptiLatent, imgs)
                 self.video_append(self.videoResultLatent, [imgs[-1]])
+            self.save_layer(image_name, w[0].repeat(1, self.G.num_ws, 1))
         self.w_pivots[image_name] = w
         return w
 
@@ -117,3 +120,9 @@ class BaseCoach:
         if self.save_video_pti:
             self.videoFittingSeed.close()
             self.videoResultLatent.close()
+
+    def save_layer(self, image_name, ws):
+        if self._save_layer is None: return
+        with torch.no_grad():
+            out, _ = Renderer.run_synthesis_net(self.G.synthesis, ws, capture_layer=self._save_layer)
+        np.save(f'{self.outdir}/{self._save_layer}_{image_name}.npy', out.cpu().numpy())

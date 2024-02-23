@@ -45,9 +45,9 @@ def fitting(**kwargs):
     initPlugins(opts.verbose)
     os.makedirs(opts.outdir, exist_ok=True)
     if opts.coach == "multi":
-        coach = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
+        coach = MultiIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot, save_layer=opts.save_layer)
     elif opts.coach == "single":
-        coach = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot)
+        coach = SingleIDCoach(device, dataloader, opts.network_path, opts.outdir, opts.save_latent, opts.save_video_latent, opts.save_video, opts.save_img_result, opts.seed, G=G, verbose=opts.verbose, load_w_pivot=opts.load_w_pivot, save_layer=opts.save_layer)
     else:
         raise TypeError("a type of coach is incorrect")
     color = opts.color[1:-1].split(',')
@@ -71,6 +71,7 @@ def fitting(**kwargs):
 @click.option('--save-latent', help='Save latent in file npz', type=bool, default=False, show_default=True, is_flag=True)
 @click.option('--save-video-latent', help='Save video for result latent optimization', type=bool, default=False, show_default=True, is_flag=True)
 @click.option('--save-img-result', help='Save image result of fitting target', type=bool, default=False, show_default=True, is_flag=True)
+@click.option('--save-layer', help='Save a specific layer to file npy. (layer name can be found in visualizer)', type=str, default=None, show_default=True)
 @click.option('--outdir', help='Where to save the output images', required=True, metavar='DIR', default='out')
 @click.option('--first-inv-steps', help='Number of inversion steps for first image', type=int, default=1000, show_default=True)
 @click.option('--inv-steps', help='Number of inversion steps for image (for first image use --first-inv-steps)', type=int, default=100, show_default=True)
